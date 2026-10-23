@@ -56,12 +56,12 @@ void test_hashset_basic(void) {
     assert(set._size == 3);
 
     // 2. Verificação de Existência (has)
-    assert(hashset_has(&set, &v1) == 1);
-    assert(hashset_has(&set, &v2) == 1);
-    assert(hashset_has(&set, &v3) == 1);
+    assert(hashset_has(set, &v1) == 1);
+    assert(hashset_has(set, &v2) == 1);
+    assert(hashset_has(set, &v3) == 1);
 
     int v_absent = 99;
-    assert(hashset_has(&set, &v_absent) == 0);
+    assert(hashset_has(set, &v_absent) == 0);
 
     // 3. Unicidade: Adicionar elemento duplicado não deve aumentar o tamanho
     hashset_add(&set, &v1);
@@ -70,7 +70,7 @@ void test_hashset_basic(void) {
     // 4. Remoção
     assert(hashset_remove(&set, &v2) == 1);
     assert(set._size == 2);
-    assert(hashset_has(&set, &v2) == 0);
+    assert(hashset_has(set, &v2) == 0);
 
     // Remover elemento já removido ou inexistente deve retornar 0
     assert(hashset_remove(&set, &v2) == 0);
@@ -95,7 +95,7 @@ void test_hashset_collisions(void) {
 
     // Todos devem ser encontrados mesmo com colisão na mesma posição inicial
     for (int i = 0; i < count; i++) {
-        assert(hashset_has(&set, &values[i]) == 1);
+        assert(hashset_has(set, &values[i]) == 1);
     }
 
     // Remove elemento do meio da cadeia de colisão
@@ -103,7 +103,7 @@ void test_hashset_collisions(void) {
     assert(set._size == count - 1);
 
     // Garante que o elemento posterior continua acessível
-    assert(hashset_has(&set, &values[4]) == 1);
+    assert(hashset_has(set, &values[4]) == 1);
 
     hashset_free(set);
     printf("[OK] Teste de colisoes concluido.\n");
@@ -130,7 +130,7 @@ void test_hashset_stress(void) {
 
     // Leitura após rehash
     for (int i = 0; i < total; i++) {
-        assert(hashset_has(&set, &i) == 1);
+        assert(hashset_has(set, &i) == 1);
     }
 
     // Remoção de metade
@@ -143,9 +143,9 @@ void test_hashset_stress(void) {
     // Validação do estado final
     for (int i = 0; i < total; i++) {
         if (i < total / 2) {
-            assert(hashset_has(&set, &i) == 0);
+            assert(hashset_has(set, &i) == 0);
         } else {
-            assert(hashset_has(&set, &i) == 1);
+            assert(hashset_has(set, &i) == 1);
         }
     }
 
@@ -168,10 +168,10 @@ void test_hashset_strings(void) {
     assert(set._size == 3);
 
     const char* query = "C++";
-    assert(hashset_has(&set, &query) == 1);
+    assert(hashset_has(set, &query) == 1);
 
     const char* query_absent = "Java";
-    assert(hashset_has(&set, &query_absent) == 0);
+    assert(hashset_has(set, &query_absent) == 0);
 
     hashset_free(set);
     printf("[OK] Teste com strings concluido.\n");

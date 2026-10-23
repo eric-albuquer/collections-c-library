@@ -48,8 +48,14 @@ gcc -Isrc tests/hashmap_test.c src/collections.c -o run_tests && ./run_tests
 
 To run all test suites in a single loop:
 
+MACOS / LINUX
 ```bash
 for file in ./tests/*.c; do gcc -Isrc "$file" ./src/collections.c -o test_bin && ./test_bin || break; done
+```
+
+WINDOWS
+```bash
+FOR %f IN (.\tests\*.c) DO gcc -Isrc "%f" .\src\collections.c -o test_bin.exe && test_bin.exe
 ```
 
 ---

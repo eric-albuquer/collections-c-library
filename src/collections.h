@@ -16,14 +16,14 @@ typedef struct ArrayList {
 ArrayList arraylist_create(int element_size, int initial_size);
 void arraylist_free(ArrayList list);
 
-int arraylist_get(ArrayList* list, int idx, void* out);
+int arraylist_get(ArrayList list, int idx, void* out);
 int arraylist_set(ArrayList* list, int idx, void* element);
 
 void arraylist_append(ArrayList* list, void* element);
 int arraylist_pop(ArrayList* list, void* out);
 
-void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*));
-void arraylist_map(ArrayList* list, void(*function)(int, const void*));
+void arraylist_sort(ArrayList list, int(*cmp)(const void*, const void*));
+void arraylist_map(ArrayList list, void(*function)(int, const void*));
 
 // ==========================================================
 // ARRAY DEQUE
@@ -101,7 +101,7 @@ HashMap hashmap_create(
 void hashmap_free(HashMap map);
 
 int hashmap_set(HashMap* map, const void* key, const void* value, void* old_value);
-int hashmap_get(HashMap* map, const void* key, void* out);
+int hashmap_get(HashMap map, const void* key, void* out);
 int hashmap_remove(HashMap* map, const void* key, void* out);
 
 // ==========================================================
@@ -132,7 +132,7 @@ HashSet hashset_create(
 void hashset_free(HashSet set);
 
 void hashset_add(HashSet* set, const void* element);
-int hashset_has(HashSet* set, const void* element);
+int hashset_has(HashSet set, const void* element);
 int hashset_remove(HashSet* set, const void* element);
 
 #endif

@@ -9,12 +9,12 @@
 // ==========================================================
 
 ArrayList arraylist_create(int element_size, int initial_size) {
-    initial_size = initial_size < START_CAPACITY ? START_CAPACITY : initial_size;
+    int initial_capacity = initial_size < START_CAPACITY ? START_CAPACITY : initial_size;
     ArrayList list = {
-        ._capacity = initial_size,
+        ._capacity = initial_capacity,
         ._element_size = element_size,
-        ._size = 0,
-        ._memory = malloc(initial_size * element_size)
+        ._size = initial_size,
+        ._memory = malloc(initial_capacity * element_size)
     };
 
     return list;
@@ -24,10 +24,10 @@ void arraylist_free(ArrayList list) {
     free(list._memory);
 }
 
-int arraylist_get(ArrayList* list, int idx, void* out) {
-    if ((unsigned int)idx >= list->_size)
+int arraylist_get(ArrayList list, int idx, void* out) {
+    if ((unsigned int)idx >= list._size)
         return 0;
-    memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
+    memcpy(out, list._memory + idx * list._element_size, list._element_size);
     return 1;
 }
 
@@ -56,13 +56,13 @@ int arraylist_pop(ArrayList* list, void* out) {
     return 1;
 }
 
-void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
-    qsort(list->_memory, list->_size, list->_element_size, cmp);
+void arraylist_sort(ArrayList list, int(*cmp)(const void*, const void*)) {
+    qsort(list._memory, list._size, list._element_size, cmp);
 }
 
-void arraylist_map(ArrayList* list, void(*function)(int, const void*)) {
-    for (int i = 0; i < list->_size; i++){
-        function(i, list->_memory + i * list->_element_size);   
+void arraylist_map(ArrayList list, void(*function)(int, const void*)) {
+    for (int i = 0; i < list._size; i++){
+        function(i, list._memory + i * list._element_size);   
     }
 }
 
@@ -414,24 +414,24 @@ int hashmap_set(HashMap* map, const void* key, const void* value, void* old_valu
     return 0;
 }
 
-int hashmap_get(HashMap* map, const void* key, void* out) {
-    unsigned int hash = map->_hash(key);
+int hashmap_get(HashMap map, const void* key, void* out) {
+    unsigned int hash = map._hash(key);
     unsigned int step = double_hash(hash);
 
-    unsigned int idx = hash & map->_mask;
+    unsigned int idx = hash & map._mask;
 
-    for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[idx] == EMPTY)
+    for (int i = 0; i < map._capacity; i++){
+        if (map._states[idx] == EMPTY)
             return 0;
-        if (map->_states[idx] == USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
+        if (map._states[idx] == USED && map._hash_cache[idx] == hash && map._equals(map._keys + idx * map._key_size, key)) {
             memcpy(
                 out,
-                map->_values + idx * map->_value_size,
-                map->_value_size
+                map._values + idx * map._value_size,
+                map._value_size
             );
             return 1;
         }
-        idx = (idx + step) & map->_mask;
+        idx = (idx + step) & map._mask;
     }
     return 0;
 }
@@ -459,6 +459,10 @@ int hashmap_remove(HashMap* map, const void* key, void* out) {
     }
     return 0;
 }
+
+// ==========================================================
+// HASH SET
+// ==========================================================
 
 static inline void hashset_resize(HashSet* set) {
     int new_capacity = set->_capacity << 1;
@@ -557,19 +561,19 @@ void hashset_add(HashSet* set, const void* element) {
     set->_size++;
 }
 
-int hashset_has(HashSet* set, const void* element) {
-    unsigned int hash = set->_hash(element);
+int hashset_has(HashSet set, const void* element) {
+    unsigned int hash = set._hash(element);
     unsigned int step = double_hash(hash);
 
-    unsigned int idx = hash & set->_mask;
+    unsigned int idx = hash & set._mask;
 
-    for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[idx] == EMPTY)
+    for (int i = 0; i < set._capacity; i++){
+        if (set._states[idx] == EMPTY)
             return 0;
-        if (set->_states[idx] == USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
+        if (set._states[idx] == USED && set._hash_cache[idx] == hash && set._equals(set._elements + idx * set._element_size, element)) {
             return 1;
         }
-        idx = (idx + step) & set->_mask;
+        idx = (idx + step) & set._mask;
     }
     return 0;
 }

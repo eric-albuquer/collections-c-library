@@ -45,7 +45,7 @@ void test_hashmap_set_return_values(void) {
 
     // Confirma se o valor foi atualizado na busca
     int out = 0;
-    assert(hashmap_get(&map, &k1, &out) == 1);
+    assert(hashmap_get(map, &k1, &out) == 1);
     assert(out == 150);
 
     hashmap_free(map);
@@ -77,7 +77,7 @@ void test_hashmap_crud(void) {
     // Leitura dos novos valores
     for (int i = 0; i < 3; i++) {
         int out = 0;
-        assert(hashmap_get(&map, &keys[i], &out) == 1);
+        assert(hashmap_get(map, &keys[i], &out) == 1);
         assert(out == values[i] * 10);
     }
 
@@ -88,7 +88,7 @@ void test_hashmap_crud(void) {
     assert(map._size == 2);
 
     // Garantir que chave removida não é mais encontrada
-    assert(hashmap_get(&map, &keys[1], &out_del) == 0);
+    assert(hashmap_get(map, &keys[1], &out_del) == 0);
 
     hashmap_free(map);
     printf("[OK] Teste CRUD basico concluido.\n");
@@ -112,7 +112,7 @@ void test_hashmap_collision_update(void) {
     assert(old_val == 150);
 
     int out = 0;
-    assert(hashmap_get(&map, &k2, &out) == 1);
+    assert(hashmap_get(map, &k2, &out) == 1);
     assert(out == 999);
 
     hashmap_free(map);
@@ -143,7 +143,7 @@ void test_hashmap_stress(void) {
     // 3. Validação final da leitura
     for (int i = 0; i < total; i++) {
         int out = 0;
-        assert(hashmap_get(&map, &i, &out) == 1);
+        assert(hashmap_get(map, &i, &out) == 1);
         assert(out == i * 3);
     }
 

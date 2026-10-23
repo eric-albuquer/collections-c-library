@@ -76,21 +76,21 @@ void test_arraylist_get_set(void) {
 
     // 1. Get válido
     int out = 0;
-    assert(arraylist_get(&list, 0, &out) == 1);
+    assert(arraylist_get(list, 0, &out) == 1);
     assert(out == 100);
 
-    assert(arraylist_get(&list, 2, &out) == 1);
+    assert(arraylist_get(list, 2, &out) == 1);
     assert(out == 300);
 
     // 2. Get fora dos limites (Out of bounds)
-    assert(arraylist_get(&list, -1, &out) == 0);
-    assert(arraylist_get(&list, 3, &out) == 0);
+    assert(arraylist_get(list, -1, &out) == 0);
+    assert(arraylist_get(list, 3, &out) == 0);
 
     // 3. Set válido
     int new_val = 999;
     assert(arraylist_set(&list, 1, &new_val) == 1); // Altera o elemento no índice 1 (200 -> 999)
 
-    assert(arraylist_get(&list, 1, &out) == 1);
+    assert(arraylist_get(list, 1, &out) == 1);
     assert(out == 999);
 
     // 4. Set fora dos limites
@@ -113,12 +113,12 @@ void test_arraylist_sort_and_map(void) {
     }
 
     // 1. Ordenação
-    arraylist_sort(&list, int_asc_cmp);
+    arraylist_sort(list, int_asc_cmp);
 
     int expected_sorted[] = {3, 12, 25, 42, 88};
     for (int i = 0; i < n; i++) {
         int out = 0;
-        assert(arraylist_get(&list, i, &out) == 1);
+        assert(arraylist_get(list, i, &out) == 1);
         assert(out == expected_sorted[i]);
     }
 
@@ -126,7 +126,7 @@ void test_arraylist_sort_and_map(void) {
     g_map_sum = 0;
     g_map_call_count = 0;
 
-    arraylist_map(&list, sum_map_func);
+    arraylist_map(list, sum_map_func);
 
     assert(g_map_call_count == n);
     assert(g_map_sum == (3 + 12 + 25 + 42 + 88)); // Soma total dos elementos
@@ -148,7 +148,7 @@ void test_arraylist_stress(void) {
 
     for (int i = 0; i < total; i++) {
         int out = 0;
-        assert(arraylist_get(&list, i, &out) == 1);
+        assert(arraylist_get(list, i, &out) == 1);
         assert(out == i);
     }
 
