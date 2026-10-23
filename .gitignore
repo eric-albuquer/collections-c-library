@@ -1,0 +1,23 @@
+# Executables and build output
+*.out
+*.exe
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+test_bin
+run_tests
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Compilation / Debugger output
+*.dSYM/
+*.gcda
+*.gcno
