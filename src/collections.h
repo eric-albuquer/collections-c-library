@@ -27,6 +27,32 @@ uint64_t char_hash(const void* value);
 uint64_t str_hash(const void* value);
 
 // ==========================================================
+// COMPARE GENERIC FUNCTIONS
+// ==========================================================
+
+int int_cmp(const void* a, const void* b);
+int long_long_cmp(const void* a, const void* b);
+int float_cmp(const void* a, const void* b);
+int double_cmp(const void* a, const void* b);
+int char_cmp(const void* a, const void* b);
+int str_cmp(const void* a, const void* b);
+
+// ==========================================================
+// MIN MAX FUNCTIONS
+// ==========================================================
+
+int int_min(int a, int b);
+int int_max(int a, int b);
+long long long_long_min(long long a, long long b);
+long long long_long_max(long long a, long long b);
+float float_min(float a, float b);
+float float_max(float a, float b);
+double double_min(double a, double b);
+double double_max(double a, double b);
+char char_min(char a, char b);
+char char_max(char a, char b);
+
+// ==========================================================
 // STRING
 // ==========================================================
 
@@ -53,6 +79,8 @@ String string_copy(String* string);
 int string_compare(String* a, String* b);
 
 void string_append(String* a, String* b);
+
+int string_contains(String* a, String* b); 
 
 bool string_equals(String* a, String* b);
 uint64_t string_hash(String* string);
@@ -90,7 +118,7 @@ bool arraylist_swap(ArrayList* list, int i, int j);
 
 void arraylist_shuffle(ArrayList* list);
 void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*));
-void arraylist_map(ArrayList* list, void(*function)(int, const void*));
+void arraylist_foreach(ArrayList* list, void(*function)(int, const void*));
 
 // ==========================================================
 // ARRAY DEQUE
@@ -119,6 +147,8 @@ void arraydeque_appendleft(ArrayDeque* deque, void* element);
 bool arraydeque_pop(ArrayDeque* deque, void* out);
 bool arraydeque_popleft(ArrayDeque* deque, void* out);
 
+void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, const void*));
+
 // ==========================================================
 // HEAP
 // ==========================================================
@@ -140,6 +170,8 @@ int heap_length(Heap* heap);
 
 void heap_push(Heap* heap, void* element);
 bool heap_pop(Heap* heap, void* out);
+
+void heap_foreach(Heap* heap, void(*function)(int, const void*));
 
 // ==========================================================
 // HASH MAP
@@ -177,6 +209,10 @@ void hashmap_set(HashMap* map, const void* key, const void* value, void* old_val
 bool hashmap_get(HashMap* map, const void* key, void* out);
 bool hashmap_remove(HashMap* map, const void* key, void* out);
 
+void hashmap_keys(HashMap* map, void (*function)(const void*));
+void hashmap_values(HashMap* map, void (*function)(const void*));
+void hashmap_items(HashMap* map, void (*function)(const void*, const void*));
+
 // ==========================================================
 // HASH SET
 // ==========================================================
@@ -209,5 +245,7 @@ int hashset_length(HashSet* set);
 void hashset_add(HashSet* set, const void* element);
 bool hashset_has(HashSet* set, const void* element);
 bool hashset_remove(HashSet* set, const void* element);
+
+void hashset_foreach(HashSet* set, void (*function)(const void*));
 
 #endif

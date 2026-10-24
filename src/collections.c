@@ -114,8 +114,129 @@ uint64_t str_hash(const void* value) {
 }
 
 // ==========================================================
+// COMPARE GENERIC FUNCTIONS
+// ==========================================================
+
+int int_cmp(const void* a, const void* b) {
+    if (a == b) return 0;
+    if (a == NULL) return -1;
+    if (b == NULL) return 1;
+
+    int val_a = *(const int*)a;
+    int val_b = *(const int*)b;
+
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
+}
+
+int long_long_cmp(const void* a, const void* b) {
+    if (a == b) return 0;
+    if (a == NULL) return -1;
+    if (b == NULL) return 1;
+
+    long long val_a = *(const long long*)a;
+    long long val_b = *(const long long*)b;
+
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
+}
+
+int float_cmp(const void* a, const void* b) {
+    if (a == b) return 0;
+    if (a == NULL) return -1;
+    if (b == NULL) return 1;
+
+    float val_a = *(const float*)a;
+    float val_b = *(const float*)b;
+
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
+}
+
+int double_cmp(const void* a, const void* b) {
+    if (a == b) return 0;
+    if (a == NULL) return -1;
+    if (b == NULL) return 1;
+
+    double val_a = *(const double*)a;
+    double val_b = *(const double*)b;
+
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
+}
+
+int char_cmp(const void* a, const void* b) {
+    if (a == b) return 0;
+    if (a == NULL) return -1;
+    if (b == NULL) return 1;
+
+    char val_a = *(const char*)a;
+    char val_b = *(const char*)b;
+
+    return (int)val_a - (int)val_b;
+}
+
+int str_cmp(const void* a, const void* b) {
+    if (a == b) return 0;
+    if (a == NULL) return -1;
+    if (b == NULL) return 1;
+
+    return strcmp((const char*)a, (const char*)b);
+}
+
+// ==========================================================
+// MIN MAX FUNCTIONS
+// ==========================================================
+
+int int_min(int a, int b) {
+    return (a < b) ? a : b;
+}
+
+int int_max(int a, int b) {
+    return (a > b) ? a : b;
+}
+
+long long long_long_min(long long a, long long b) {
+    return (a < b) ? a : b;
+}
+
+long long long_long_max(long long a, long long b) {
+    return (a > b) ? a : b;
+}
+
+float float_min(float a, float b) {
+    return (a < b) ? a : b;
+}
+
+float float_max(float a, float b) {
+    return (a > b) ? a : b;
+}
+
+double double_min(double a, double b) {
+    return (a < b) ? a : b;
+}
+
+double double_max(double a, double b) {
+    return (a > b) ? a : b;
+}
+
+char char_min(char a, char b) {
+    return (a < b) ? a : b;
+}
+
+char char_max(char a, char b) {
+    return (a > b) ? a : b;
+}
+
+// ==========================================================
 // STRING
 // ==========================================================
+
+#define ALPHABET_SIZE 256
 
 static inline void string_resize(String* s) {
     s->_capacity <<= 1;
@@ -199,6 +320,47 @@ void string_append(String* a, String* b) {
         idx++;
     }
     a->_size += b->_size;
+}
+
+static inline void build_shift_table(const char* pattern, int m, int* bad_char) {
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        bad_char[i] = m;
+    }
+
+    for (int i = 0; i < m - 1; i++) {
+        unsigned char c = (unsigned char)pattern[i];
+        bad_char[c] = m - 1 - i;
+    }
+}
+
+int string_contains(String* a, String* b) {
+    int n = a->_size - 1;
+    int m = b->_size - 1;
+
+    if (m == 0) return 0; 
+    if (n < m) return -1;   
+
+    int bad_char[ALPHABET_SIZE];
+    build_shift_table(b->_memory, m, bad_char);
+
+    int i = 0;
+
+    while (i <= n - m) {
+        int j = m - 1; 
+
+        while (j >= 0 && b->_memory[j] == a->_memory[i + j]) {
+            j--;
+        }
+
+        if (j < 0) {
+            return i;
+        }
+
+        unsigned char mismatched_char = (unsigned char)a->_memory[i + m - 1];
+        i += bad_char[mismatched_char];
+    }
+
+    return -1;
 }
 
 bool string_equals(String* a, String* b) {
@@ -329,11 +491,88 @@ void arraylist_shuffle(ArrayList* list) {
     }
 }
 
-void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
-    qsort(list->_memory, list->_size, list->_element_size, cmp);
+static inline int calc_min_run(int n) {
+    int r = 0;
+    while(n >= 64) {
+        r |= n & 1;
+        n >>= 1;
+    }
+    return n + r;
 }
 
-void arraylist_map(ArrayList* list, void(*function)(int, const void*)) {
+static inline void insertion_sort(ArrayList* list, int left, int right, int(*cmp)(const void*, const void*)) {
+    for (int i = left + 1; i < right + 1; i++){
+        memcpy(list->_swap_buffer, list->_memory + i * list->_element_size, list->_element_size);
+        int j = i - 1;
+        while (j >= left && cmp(list->_memory + j * list->_element_size, list->_swap_buffer) > 0) {
+            memcpy(list->_memory + (j + 1) * list->_element_size, list->_memory + j * list->_element_size, list->_element_size);
+            j--;
+        }
+        memcpy(list->_memory + (j + 1) * list->_element_size, list->_swap_buffer, list->_element_size);
+    }  
+}
+
+static inline void merge(ArrayList* list, unsigned char* aux, int l, int m, int r, int(*cmp)(const void*, const void*)) {
+    int i = l;
+    int j = m;
+    int k = l;
+
+    while (i < m && j < r) {
+        if (cmp(aux + i * list->_element_size, aux + j * list->_element_size) <= 0) {
+            memcpy(list->_memory + k * list->_element_size, aux + i * list->_element_size, list->_element_size);
+            i++;
+        } else {
+            memcpy(list->_memory + k * list->_element_size, aux + j * list->_element_size, list->_element_size);
+            j++;
+        }
+        k++;
+    }
+
+    while (i < m) {
+        memcpy(list->_memory + k * list->_element_size, aux + i * list->_element_size, list->_element_size);
+        i++;
+        k++;
+    }
+
+    while (j < r) {
+        memcpy(list->_memory + k * list->_element_size, aux + j * list->_element_size, list->_element_size);
+        j++;
+        k++;
+    }
+}
+
+void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
+    int n = list->_size;
+    int min_run = calc_min_run(n);
+
+    for (int i = 0; i < n; i += min_run){
+        int end = int_min(i + min_run - 1, n - 1);
+        insertion_sort(list, i, end, cmp);
+    }
+
+    unsigned char* aux = malloc(list->_element_size * list->_size);
+    
+    int size = min_run;
+    while (size < n) {
+        const int double_size = size * 2;
+        unsigned char* temp = list->_memory;
+        list->_memory = aux;
+        aux = temp;
+        for (int i = 0; i < n; i += double_size){
+            int mid = int_min(i + size - 1, n - 1);
+            int end = int_min(i + double_size - 1, n - 1);
+
+            if (mid < end)
+                merge(list, aux, i, mid, end, cmp);
+        }
+        size = double_size;
+    }
+
+    free(aux);
+    //qsort(list->_memory, list->_size, list->_element_size, cmp);
+}
+
+void arraylist_foreach(ArrayList* list, void(*function)(int, const void*)) {
     for (int i = 0; i < list->_size; i++){
         function(i, list->_memory + i * list->_element_size);   
     }
@@ -452,6 +691,14 @@ bool arraydeque_popleft(ArrayDeque* deque, void* out) {
     return 1;
 }
 
+void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, const void*)) {
+    int curr = deque->_head;
+    for (int i = 0; i < deque->_size; i++){
+        function(i, deque->_memory + curr * deque->_element_size);
+        curr = (curr + 1) & deque->_mask;   
+    }
+}
+
 // ==========================================================
 // HEAP
 // ==========================================================
@@ -566,6 +813,12 @@ bool heap_pop(Heap* heap, void* out) {
         heap->_element_size
     );
     return 1;
+}
+
+void heap_foreach(Heap* heap, void(*function)(int, const void*)) {
+    for (int i = 0; i < heap->_size; i++){
+        function(i, heap->_memory + i * heap->_element_size);
+    }
 }
 
 // ==========================================================
@@ -750,6 +1003,30 @@ bool hashmap_remove(HashMap* map, const void* key, void* out) {
     return 0;
 }
 
+void hashmap_keys(HashMap* map, void (*function)(const void*)) {
+    for (int i = 0; i < map->_capacity; i++){
+        if (map->_states[i] != USED)
+            continue;
+        function(map->_keys + i * map->_key_size);
+    }
+}
+
+void hashmap_values(HashMap* map, void (*function)(const void*)) {
+    for (int i = 0; i < map->_capacity; i++){
+        if (map->_states[i] != USED)
+            continue;
+        function(map->_values + i * map->_value_size);
+    }
+}
+
+void hashmap_items(HashMap* map, void (*function)(const void*, const void*)) {
+    for (int i = 0; i < map->_capacity; i++){
+        if (map->_states[i] != USED)
+            continue;
+        function(map->_keys + i * map->_key_size, map->_values + i * map->_value_size);
+    }
+}
+
 // ==========================================================
 // HASH SET
 // ==========================================================
@@ -892,4 +1169,12 @@ bool hashset_remove(HashSet* set, const void* element) {
         idx = (idx + step) & set->_mask;
     }
     return 0;
+}
+
+void hashset_foreach(HashSet* set, void (*function)(const void*)) {
+    for (int i = 0; i < set->_capacity; i++){
+        if (set->_states[i] != USED)
+            continue;
+        function(set->_elements + i * set->_element_size);
+    }
 }

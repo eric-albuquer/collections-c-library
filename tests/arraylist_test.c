@@ -197,7 +197,7 @@ void test_arraylist_sort_map_shuffle(void) {
     // 2. Teste do Map
     g_map_sum = 0;
     g_map_calls = 0;
-    arraylist_map(&list, accumulate_map_func);
+    arraylist_foreach(&list, accumulate_map_func);
     assert(g_map_calls == n);
     assert(g_map_sum == (3 + 12 + 25 + 42 + 88));
 

@@ -125,6 +125,40 @@ void test_string_hash(void) {
     printf("[OK] Teste de hash e cache concluido.\n");
 }
 
+void test_string_contains(void) {
+    String main_str = string_create("Programando em C com colecoes modernas");
+
+    // Substring no início
+    String sub_start = string_create("Programando");
+    assert(string_contains(&main_str, &sub_start) == 0);
+
+    // Substring no meio
+    String sub_mid = string_create("em C");
+    assert(string_contains(&main_str, &sub_mid) == 12);
+
+    // Substring no fim
+    String sub_end = string_create("modernas");
+    assert(string_contains(&main_str, &sub_end) == 30);
+
+    // Substring inexistente
+    String sub_missing = string_create("Python");
+    assert(string_contains(&main_str, &sub_missing) < 0);
+
+    // Substring maior que a string principal
+    String sub_larger = string_create("Programando em C com colecoes modernas e completas");
+    assert(string_contains(&main_str, &sub_larger) < 0);
+
+    // Limpeza
+    string_free(&main_str);
+    string_free(&sub_start);
+    string_free(&sub_mid);
+    string_free(&sub_end);
+    string_free(&sub_missing);
+    string_free(&sub_larger);
+
+    printf("[OK] Teste de string_contains concluido com sucesso.\n");
+}
+
 // Teste 6: Stress e Performance (Benchmark)
 void test_string_performance_and_stress(void) {
     printf("[BENCHMARK] Iniciando teste de estresse e performance...\n");
@@ -174,6 +208,7 @@ int main(void) {
     test_string_manipulation();
     test_string_copy_and_clear();
     test_string_hash();
+    test_string_contains();
     test_string_performance_and_stress();
 
     printf("\n--- Todos os testes robustos passaram com sucesso! 🎉 ---\n");
