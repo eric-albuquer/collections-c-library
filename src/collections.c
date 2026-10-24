@@ -243,7 +243,7 @@ static inline void string_resize(String* s) {
     s->_memory = realloc(s->_memory, s->_capacity);
 }
 
-String string_create(char* str) {
+String string_create(const char* str) {
     String string = {
         ._capacity = START_CAPACITY,
         ._hash_computed = 0,
@@ -271,15 +271,15 @@ void string_free(String* string) {
     string->_memory = NULL;
 }
 
-char* string_get_str(String* string) {
+const char* string_get_str(const String* string) {
     return string->_memory;
 }
 
-int string_length(String* string) {
+int string_length(const String* string) {
     return string->_size - 1;
 }
 
-void string_append_char(String* string, char chr) {
+void string_append_char(String* string, const char chr) {
     string->_hash_computed = false;
     if (string->_size == string->_capacity)
         string_resize(string);
@@ -295,7 +295,7 @@ void string_clear(String* string) {
     string->_size = 1;
 }
 
-String string_copy(String* string) {
+String string_copy(const String* string) {
     String copy = string_create(string->_memory);
     if (string->_hash_computed) {
         copy._hash = string->_hash;
@@ -305,11 +305,11 @@ String string_copy(String* string) {
     return copy;
 }
 
-int string_compare(String* a, String* b) {
+int string_compare(const String* a, const String* b) {
     return strcmp(a->_memory, b->_memory);
 }
 
-void string_append(String* a, String* b) {
+void string_extend(String* a, const String* b) {
     a->_hash_computed = false;
     int idx = --a->_size;
     for (int i = 0; i < b->_size; i++){
@@ -333,7 +333,7 @@ static inline void build_shift_table(const char* pattern, int m, int* bad_char) 
     }
 }
 
-int string_contains(String* a, String* b) {
+int string_index_of(const String* a, const String* b) {
     int n = a->_size - 1;
     int m = b->_size - 1;
 
@@ -363,7 +363,11 @@ int string_contains(String* a, String* b) {
     return -1;
 }
 
-bool string_equals(String* a, String* b) {
+bool string_contains(const String* a, const String* b) {
+    return string_index_of(a, b) != -1;
+}
+
+bool string_equals(const String* a, const String* b) {
     if (a->_hash_computed && b->_hash_computed && a->_hash != b->_hash)
         return 0;
     return str_equals(a->_memory, b->_memory);
@@ -375,6 +379,12 @@ uint64_t string_hash(String* string) {
     string->_hash = str_hash(string->_memory);
     string->_hash_computed = 1;
     return string->_hash;
+}
+
+String string_concatenate(const String* a, const String* b) {
+    String res = string_copy(a);
+    string_extend(&res, b);
+    return res;
 }
 
 // ==========================================================
@@ -406,25 +416,25 @@ void arraylist_free(ArrayList* list) {
     list->_memory = NULL;
 }
 
-int arraylist_length(ArrayList* list) {
+int arraylist_length(const ArrayList* list) {
     return list->_size;
 }
 
-bool arraylist_get(ArrayList* list, int idx, void* out) {
+bool arraylist_get(const ArrayList* list, int idx, void* out) {
     if ((unsigned int)idx >= list->_size)
         return 0;
     memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
     return 1;
 }
 
-bool arraylist_set(ArrayList* list, int idx, void* element) {
+bool arraylist_set(ArrayList* list, int idx, const void* element) {
     if ((unsigned int)idx >= list->_size)
         return 0;
     memcpy(list->_memory + idx * list->_element_size, element, list->_element_size);
     return 1;
 }
 
-bool arraylist_insert_index(ArrayList* list, int idx, void* element) {
+bool arraylist_insert_index(ArrayList* list, int idx, const void* element) {
     if ((unsigned int)idx > list->_size)
         return 0;
 
@@ -458,7 +468,7 @@ void arraylist_clear(ArrayList* list) {
     list->_size = 0;
 }
 
-void arraylist_append(ArrayList* list, void* element) {
+void arraylist_append(ArrayList* list, const void* element) {
     if (list->_size == list->_capacity)
         arraylist_resize(list);
 
@@ -572,6 +582,19 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
     //qsort(list->_memory, list->_size, list->_element_size, cmp);
 }
 
+ArrayList arraylist_copy(const ArrayList* list) {
+    ArrayList copy = {
+        ._capacity = list->_capacity,
+        ._element_size = list->_element_size,
+        ._size = list->_size,
+        ._swap_buffer = malloc(list->_element_size),
+        ._memory = malloc(list->_element_size * list->_capacity)
+    };
+
+    memcpy(copy._memory, list->_memory, list->_size * list->_element_size);
+    return copy;
+}
+
 void arraylist_foreach(ArrayList* list, void(*function)(int, const void*)) {
     for (int i = 0; i < list->_size; i++){
         function(i, list->_memory + i * list->_element_size);   
@@ -627,11 +650,11 @@ void arraydeque_free(ArrayDeque* deque) {
     deque->_memory = NULL;
 }
 
-int arraydeque_length(ArrayDeque* deque) {
+int arraydeque_length(const ArrayDeque* deque) {
     return deque->_size;
 }
 
-void arraydeque_append(ArrayDeque* deque, void* element) {
+void arraydeque_append(ArrayDeque* deque, const void* element) {
     if (deque->_size == deque->_capacity)
         arraydeque_resize(deque);
 
@@ -645,7 +668,7 @@ void arraydeque_append(ArrayDeque* deque, void* element) {
     deque->_size++;
 }
 
-void arraydeque_appendleft(ArrayDeque* deque, void* element) {
+void arraydeque_appendleft(ArrayDeque* deque, const void* element) {
     if (deque->_size == deque->_capacity)
         arraydeque_resize(deque);
 
@@ -691,6 +714,20 @@ bool arraydeque_popleft(ArrayDeque* deque, void* out) {
     return 1;
 }
 
+ArrayDeque arraydeque_copy(const ArrayDeque* deque) {
+    ArrayDeque copy = {
+        ._capacity = deque->_capacity,
+        ._element_size = deque->_element_size,
+        ._head = deque->_head,
+        ._tail = deque->_tail,
+        ._mask = deque->_mask,
+        ._memory = malloc(deque->_capacity * deque->_element_size)
+    };
+
+    memcpy(copy._memory, deque->_memory, deque->_capacity * deque->_element_size);
+    return copy;
+}
+
 void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, const void*)) {
     int curr = deque->_head;
     for (int i = 0; i < deque->_size; i++){
@@ -725,11 +762,11 @@ void heap_free(Heap* heap) {
     heap->_memory = NULL;
 }
 
-int heap_length(Heap* heap) {
+int heap_length(const Heap* heap) {
     return heap->_size;
 }
 
-void heap_push(Heap* heap, void* element) {
+void heap_push(Heap* heap, const void* element) {
     if (heap->_size == heap->_capacity)
         heap_resize(heap);
 
@@ -813,6 +850,20 @@ bool heap_pop(Heap* heap, void* out) {
         heap->_element_size
     );
     return 1;
+}
+
+Heap heap_copy(const Heap* heap) {
+    Heap copy = {
+        ._capacity = heap->_capacity,
+        ._element_size = heap->_element_size,
+        ._cmp = heap->_cmp,
+        ._size = heap->_size,
+        ._memory = malloc(heap->_capacity * heap->_element_size)
+    };
+
+    memcpy(copy._memory, heap->_memory, heap->_size * heap->_element_size);
+
+    return copy;
 }
 
 void heap_foreach(Heap* heap, void(*function)(int, const void*)) {
@@ -920,7 +971,7 @@ void hashmap_free(HashMap* map) {
     map->_hash_cache = NULL;
 }
 
-int hashmap_length(HashMap* map) {
+int hashmap_length(const HashMap* map) {
     return map->_size;
 }
 
@@ -957,7 +1008,7 @@ void hashmap_set(HashMap* map, const void* key, const void* value, void* old_val
     map->_size++;
 }
 
-bool hashmap_get(HashMap* map, const void* key, void* out) {
+bool hashmap_get(const HashMap* map, const void* key, void* out) {
     uint64_t hash = map->_hash(key);
     uint64_t step = double_hash_step(hash);
 
@@ -1001,6 +1052,19 @@ bool hashmap_remove(HashMap* map, const void* key, void* out) {
         idx = (idx + step) & map->_mask;
     }
     return 0;
+}
+
+HashMap hashmap_copy(const HashMap* map) {
+    HashMap copy = hashmap_create(map->_key_size, map->_value_size, map->_equals, map->_hash);
+
+    for (int i = 0; i < map->_capacity; i++){
+        if (map->_states[i] != USED) 
+            continue;
+        
+        hashmap_set(&copy, map->_keys + i * map->_key_size, map->_values + i * map->_value_size, NULL);
+    }
+    
+    return copy;
 }
 
 void hashmap_keys(HashMap* map, void (*function)(const void*)) {
@@ -1104,7 +1168,7 @@ void hashset_free(HashSet* set) {
     set->_elements = NULL;
 }
 
-int hashset_length(HashSet* set) {
+int hashset_length(const HashSet* set) {
     return set->_size;
 }
 
@@ -1135,7 +1199,7 @@ void hashset_add(HashSet* set, const void* element) {
     set->_size++;
 }
 
-bool hashset_has(HashSet* set, const void* element) {
+bool hashset_has(const HashSet* set, const void* element) {
     uint64_t hash = set->_hash(element);
     uint64_t step = double_hash_step(hash);
 
@@ -1171,7 +1235,7 @@ bool hashset_remove(HashSet* set, const void* element) {
     return 0;
 }
 
-HashSet hashset_copy(HashSet* set) {
+HashSet hashset_copy(const HashSet* set) {
     HashSet copy = hashset_create(set->_element_size, set->_equals, set->_hash);
 
     for (int i = 0; i < set->_capacity; i++){
@@ -1184,7 +1248,7 @@ HashSet hashset_copy(HashSet* set) {
     return copy;
 }
 
-HashSet hashset_union(HashSet* a, HashSet* b) {
+HashSet hashset_union(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
     
     for (int i = 0; i < b->_capacity; i++){
@@ -1197,9 +1261,9 @@ HashSet hashset_union(HashSet* a, HashSet* b) {
     return result;
 }
 
-HashSet hashset_intersection(HashSet* a, HashSet* b) {
-    HashSet* bigger;
-    HashSet* smaller;
+HashSet hashset_intersection(const HashSet* a, const HashSet* b) {
+    const HashSet* bigger;
+    const HashSet* smaller;
 
     if (a->_size >= b->_size) {
         bigger = a;
@@ -1223,7 +1287,7 @@ HashSet hashset_intersection(HashSet* a, HashSet* b) {
     return result;
 }
 
-HashSet hashset_difference(HashSet* a, HashSet* b) {
+HashSet hashset_difference(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
 
     for (int i = 0; i < b->_capacity; i++){
@@ -1270,16 +1334,9 @@ FrozenHashSet frozenhashset_create(HashSet set) {
     HashSet copy_set = hashset_copy(&set);
     FrozenHashSet f_set = {
         ._set = copy_set,
+        ._checksum_computed = 0,
         ._checksum = 0
     };
-
-    for (int i = 0; i < copy_set._capacity; i++){
-        if (copy_set._states[i] != USED)
-            continue;
-        
-        uint64_t element_hash = hash_element_bytes(copy_set._elements + i * copy_set._element_size, copy_set._element_size);
-        f_set._checksum += mix_bits(element_hash);
-    }
     
     return f_set;
 }
@@ -1288,16 +1345,16 @@ void frozenhashset_free(FrozenHashSet* f_set) {
     hashset_free(&f_set->_set);
 }
 
-int frozenhashset_length(FrozenHashSet* f_set) {
+int frozenhashset_length(const FrozenHashSet* f_set) {
     return f_set->_set._size;
 }
 
-bool frozenhashset_has(FrozenHashSet* f_set, const void* element) {
+bool frozenhashset_has(const FrozenHashSet* f_set, const void* element) {
     return hashset_has(&f_set->_set, element);
 }
 
-bool frozenhashset_equals(FrozenHashSet* a, FrozenHashSet* b) {
-    if (a->_checksum != b->_checksum)
+bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b) {
+    if (a->_checksum_computed && b->_checksum_computed && a->_checksum != b->_checksum)
         return 0;
     if (a->_set._size != b->_set._size)
         return 0;
@@ -1316,20 +1373,32 @@ bool frozenhashset_equals(FrozenHashSet* a, FrozenHashSet* b) {
 }
 
 uint64_t frozenhashset_hash(FrozenHashSet* f_set) {
+    if (f_set->_checksum_computed)
+        return f_set->_checksum;
+
+    for (int i = 0; i < f_set->_set._capacity; i++){
+        if (f_set->_set._states[i] != USED)
+            continue;
+        
+        uint64_t element_hash = hash_element_bytes(f_set->_set._elements + i * f_set->_set._element_size, f_set->_set._element_size);
+        f_set->_checksum += mix_bits(element_hash);
+    }
+
+    f_set->_checksum_computed = 1;
     return f_set->_checksum;
 }
 
-FrozenHashSet frozenhashset_union(FrozenHashSet* a, FrozenHashSet* b) {
+FrozenHashSet frozenhashset_union(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet u = hashset_union(&a->_set, &b->_set);
     return frozenhashset_create(u);
 }
 
-FrozenHashSet frozenhashset_intersection(FrozenHashSet* a, FrozenHashSet* b) {
+FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet i = hashset_intersection(&a->_set, &b->_set);
     return frozenhashset_create(i);
 }
 
-FrozenHashSet frozenhashset_difference(FrozenHashSet* a, FrozenHashSet* b) {
+FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet d = hashset_difference(&a->_set, &b->_set);
     return frozenhashset_create(d);
 }
@@ -1374,7 +1443,7 @@ void* objpool_malloc(ObjectPool* pool) {
     return obj;
 }
 
-void objpool_obj_free(ObjectPool* pool, void* obj) {
+void objpool_free_obj(ObjectPool* pool, void* obj) {
     *(int*)obj = pool->_head;
     pool->_head = ((unsigned char*)obj - pool->_memory) / pool->_obj_size;
     pool->_used--;

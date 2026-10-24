@@ -68,7 +68,7 @@ void test_string_manipulation(void) {
 
     // 2. Append de outra String
     String s2 = string_create(" C");
-    string_append(&s1, &s2);
+    string_extend(&s1, &s2);
     assert(s1._hash_computed == false);
     assert(string_length(&s1) == 8);
     assert(strcmp(string_get_str(&s1), "Hello! C") == 0);
@@ -130,23 +130,23 @@ void test_string_contains(void) {
 
     // Substring no início
     String sub_start = string_create("Programando");
-    assert(string_contains(&main_str, &sub_start) == 0);
+    assert(string_index_of(&main_str, &sub_start) == 0);
 
     // Substring no meio
     String sub_mid = string_create("em C");
-    assert(string_contains(&main_str, &sub_mid) == 12);
+    assert(string_index_of(&main_str, &sub_mid) == 12);
 
     // Substring no fim
     String sub_end = string_create("modernas");
-    assert(string_contains(&main_str, &sub_end) == 30);
+    assert(string_index_of(&main_str, &sub_end) == 30);
 
     // Substring inexistente
     String sub_missing = string_create("Python");
-    assert(string_contains(&main_str, &sub_missing) < 0);
+    assert(string_index_of(&main_str, &sub_missing) < 0);
 
     // Substring maior que a string principal
     String sub_larger = string_create("Programando em C com colecoes modernas e completas");
-    assert(string_contains(&main_str, &sub_larger) < 0);
+    assert(string_index_of(&main_str, &sub_larger) < 0);
 
     // Limpeza
     string_free(&main_str);
@@ -156,7 +156,7 @@ void test_string_contains(void) {
     string_free(&sub_missing);
     string_free(&sub_larger);
 
-    printf("[OK] Teste de string_contains concluido com sucesso.\n");
+    printf("[OK] Teste de string_index_of concluido com sucesso.\n");
 }
 
 // Teste 6: Stress e Performance (Benchmark)

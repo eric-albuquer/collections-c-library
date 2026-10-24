@@ -43,7 +43,7 @@ void test_objpool_basic(void) {
     assert(p3->x == 50 && p3->y == 60);
 
     // Libera um objeto
-    objpool_obj_free(&pool, p2);
+    objpool_free_obj(&pool, p2);
     assert(pool._used == 2);
 
     objpool_free(&pool);
@@ -63,7 +63,7 @@ void test_objpool_reuse(void) {
     *c = 300;
 
     // Libera o meio (b)
-    objpool_obj_free(&pool, b);
+    objpool_free_obj(&pool, b);
     assert(pool._used == 2);
 
     // Aloca novamente: deve reutilizar exatamente o slot que b liberou (LIFO via _head)
@@ -95,7 +95,7 @@ void test_objpool_capacity_limits(void) {
     assert(p_overflow == NULL);
 
     // Liberar um e tentar alocar novamente deve funcionar
-    objpool_obj_free(&pool, p1);
+    objpool_free_obj(&pool, p1);
     assert(pool._used == 1);
 
     int* p3 = (int*)objpool_malloc(&pool);
@@ -127,7 +127,7 @@ void test_objpool_stress_and_performance(void) {
 
     // 2. Libera todos os objetos
     for (int i = 0; i < capacity; i++) {
-        objpool_obj_free(&pool, ptrs[i]);
+        objpool_free_obj(&pool, ptrs[i]);
     }
     assert(pool._used == 0);
 
