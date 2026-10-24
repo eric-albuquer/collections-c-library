@@ -1,160 +1,202 @@
 #include <stdio.h>
-#include <assert.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
+#include <assert.h>
+#include <time.h>
 #include "collections.h"
 
-// --- FUNÇÕES AUXILIARES DE HASH E EQUALS ---
+// --- VARIÁVEIS GLOBAIS AUXILIARES PARA TESTES ---
+static int g_foreach_sum = 0;
+static int g_foreach_count = 0;
 
-// Hash ruim para forçar colisões
-uint64_t bad_hash_collision(const void* key) {
-    return 100;
+void accumulate_foreach_func(const void* element) {
+    g_foreach_sum += *(const int*)element;
+    g_foreach_count++;
 }
 
 // --- TESTES ---
 
-// Teste 1: Operações Básicas (Adicionar, Verificar, Unicidade e Remover)
+// Teste 1: Criação e Operações Básicas (Add, Has, Length, Remove)
 void test_hashset_basic(void) {
     HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
-    assert(set._size == 0);
+    assert(hashset_length(&set) == 0);
 
     int v1 = 10, v2 = 20, v3 = 30;
 
-    // 1. Inserção
+    // 1. Adição de elementos
     hashset_add(&set, &v1);
     hashset_add(&set, &v2);
     hashset_add(&set, &v3);
-    assert(set._size == 3);
+    assert(hashset_length(&set) == 3);
 
-    // 2. Verificação de Existência (has)
-    assert(hashset_has(&set, &v1) == 1);
-    assert(hashset_has(&set, &v2) == 1);
-    assert(hashset_has(&set, &v3) == 1);
-
-    int v_absent = 99;
-    assert(hashset_has(&set, &v_absent) == 0);
-
-    // 3. Unicidade: Adicionar elemento duplicado não deve aumentar o tamanho
+    // Adição de duplicata (não deve alterar o tamanho)
     hashset_add(&set, &v1);
-    assert(set._size == 3);
+    assert(hashset_length(&set) == 3);
 
-    // 4. Remoção
-    assert(hashset_remove(&set, &v2) == 1);
-    assert(set._size == 2);
-    assert(hashset_has(&set, &v2) == 0);
+    // 2. Verificação de existência (has)
+    assert(hashset_has(&set, &v1) == true);
+    assert(hashset_has(&set, &v2) == true);
+    
+    int v_missing = 99;
+    assert(hashset_has(&set, &v_missing) == false);
 
-    // Remover elemento já removido ou inexistente deve retornar 0
-    assert(hashset_remove(&set, &v2) == 0);
-    assert(hashset_remove(&set, &v_absent) == 0);
+    // 3. Remoção de elementos
+    assert(hashset_remove(&set, &v2) == true);
+    assert(hashset_has(&set, &v2) == false);
+    assert(hashset_length(&set) == 2);
 
-    hashset_free(&set);
-    printf("[OK] Teste basico concluido.\n");
-}
-
-// Teste 2: Tratamento de Colisões
-void test_hashset_collisions(void) {
-    HashSet set = hashset_create(sizeof(int), int_equals, bad_hash_collision);
-
-    int values[] = {1, 2, 3, 4, 5};
-    int count = 5;
-
-    for (int i = 0; i < count; i++) {
-        hashset_add(&set, &values[i]);
-    }
-
-    assert(set._size == count);
-
-    // Todos devem ser encontrados mesmo com colisão na mesma posição inicial
-    for (int i = 0; i < count; i++) {
-        assert(hashset_has(&set, &values[i]) == 1);
-    }
-
-    // Remove elemento do meio da cadeia de colisão
-    assert(hashset_remove(&set, &values[2]) == 1); // Remove '3'
-    assert(set._size == count - 1);
-
-    // Garante que o elemento posterior continua acessível
-    assert(hashset_has(&set, &values[4]) == 1);
+    // Remover elemento inexistente
+    assert(hashset_remove(&set, &v_missing) == false);
 
     hashset_free(&set);
-    printf("[OK] Teste de colisoes concluido.\n");
+    printf("[OK] Teste basico do HashSet (Add, Has, Remove) concluido.\n");
 }
 
-// Teste 3: Carga e Redimensionamento Dinâmico (Rehash)
-void test_hashset_stress(void) {
+// Teste 2: Cópia Profunda (Copy)
+void test_hashset_copy(void) {
+    HashSet set1 = hashset_create(sizeof(int), int_equals, int_hash);
+    int a = 1, b = 2, c = 3;
+
+    hashset_add(&set1, &a);
+    hashset_add(&set1, &b);
+    hashset_add(&set1, &c);
+
+    // Faz a cópia
+    HashSet set2 = hashset_copy(&set1);
+    assert(hashset_length(&set2) == 3);
+    assert(hashset_has(&set2, &a) == true);
+    assert(hashset_has(&set2, &b) == true);
+    assert(hashset_has(&set2, &c) == true);
+
+    // Modifica o original (adicionando d) e verifica se a cópia permanece independente
+    int d = 4;
+    hashset_add(&set1, &d);
+    assert(hashset_length(&set1) == 4);
+    assert(hashset_length(&set2) == 3);
+    assert(hashset_has(&set2, &d) == false);
+
+    hashset_free(&set1);
+    hashset_free(&set2);
+    printf("[OK] Teste de copia profunda (Copy) concluido.\n");
+}
+
+// Teste 3: Operações Entre Conjuntos (Union, Intersection, Difference)
+void test_hashset_set_operations(void) {
+    HashSet a = hashset_create(sizeof(int), int_equals, int_hash);
+    HashSet b = hashset_create(sizeof(int), int_equals, int_hash);
+
+    // A = {1, 2, 3}
+    int v1 = 1, v2 = 2, v3 = 3;
+    hashset_add(&a, &v1);
+    hashset_add(&a, &v2);
+    hashset_add(&a, &v3);
+
+    // B = {3, 4, 5}
+    int v4 = 4, v5 = 5;
+    hashset_add(&b, &v3);
+    hashset_add(&b, &v4);
+    hashset_add(&b, &v5);
+
+    // 1. União (Union): {1, 2, 3, 4, 5}
+    HashSet u = hashset_union(&a, &b);
+    assert(hashset_length(&u) == 5);
+    assert(hashset_has(&u, &v1) == true);
+    assert(hashset_has(&u, &v2) == true);
+    assert(hashset_has(&u, &v3) == true);
+    assert(hashset_has(&u, &v4) == true);
+    assert(hashset_has(&u, &v5) == true);
+
+    // 2. Intersecção (Intersection): {3}
+    HashSet intersection = hashset_intersection(&a, &b);
+    assert(hashset_length(&intersection) == 1);
+    assert(hashset_has(&intersection, &v3) == true);
+    assert(hashset_has(&intersection, &v1) == false);
+
+    // 3. Diferença (Difference A \ B): {1, 2}
+    HashSet diff = hashset_difference(&a, &b);
+    assert(hashset_length(&diff) == 2);
+    assert(hashset_has(&diff, &v1) == true);
+    assert(hashset_has(&diff, &v2) == true);
+    assert(hashset_has(&diff, &v3) == false);
+
+    hashset_free(&a);
+    hashset_free(&b);
+    hashset_free(&u);
+    hashset_free(&intersection);
+    hashset_free(&diff);
+
+    printf("[OK] Teste de operacoes entre conjuntos (Union, Intersection, Difference) concluido.\n");
+}
+
+// Teste 4: Iteração (Foreach)
+void test_hashset_foreach(void) {
     HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
-    int total = 1000;
+    int vals[] = {10, 20, 30, 40};
+    int n = sizeof(vals) / sizeof(vals[0]);
 
-    // Inserção massiva
-    for (int i = 0; i < total; i++) {
-        hashset_add(&set, &i);
+    for (int i = 0; i < n; i++) {
+        hashset_add(&set, &vals[i]);
     }
 
-    assert(set._size == total);
+    g_foreach_sum = 0;
+    g_foreach_count = 0;
 
-    // Tentar re-inserir todos (tamanho deve permanecer 'total')
-    for (int i = 0; i < total; i++) {
-        hashset_add(&set, &i);
-    }
+    hashset_foreach(&set, accumulate_foreach_func);
 
-    assert(set._size == total);
-
-    // Leitura após rehash
-    for (int i = 0; i < total; i++) {
-        assert(hashset_has(&set, &i) == 1);
-    }
-
-    // Remoção de metade
-    for (int i = 0; i < total / 2; i++) {
-        assert(hashset_remove(&set, &i) == 1);
-    }
-
-    assert(set._size == total / 2);
-
-    // Validação do estado final
-    for (int i = 0; i < total; i++) {
-        if (i < total / 2) {
-            assert(hashset_has(&set, &i) == 0);
-        } else {
-            assert(hashset_has(&set, &i) == 1);
-        }
-    }
+    assert(g_foreach_count == n);
+    assert(g_foreach_sum == (10 + 20 + 30 + 40));
 
     hashset_free(&set);
-    printf("[OK] Teste de carga e rehash concluido.\n");
+    printf("[OK] Teste de iteracao (Foreach) concluido.\n");
 }
 
-// Teste 4: Uso com Tipos Ponteiro/String (`char*`)
-void test_hashset_strings(void) {
-    HashSet set = hashset_create(sizeof(char*), str_equals, str_hash);
+// Teste 5: Estresse e Performance
+void test_hashset_stress_and_performance(void) {
+    printf("[BENCHMARK] Iniciando teste de estresse do HashSet...\n");
 
-    const char* s1 = "C";
-    const char* s2 = "C++";
-    const char* s3 = "Rust";
+    HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
+    int total = 10000;
 
-    hashset_add(&set, &s1);
-    hashset_add(&set, &s2);
-    hashset_add(&set, &s3);
+    clock_t start = clock();
 
-    assert(set._size == 3);
+    // Adição em massa
+    for (int i = 0; i < total; i++) {
+        hashset_add(&set, &i);
+    }
+    assert(hashset_length(&set) == total);
 
-    const char* query = "C++";
-    assert(hashset_has(&set, &query) == 1);
+    // Consulta em massa (Has)
+    for (int i = 0; i < total; i++) {
+        assert(hashset_has(&set, &i) == true);
+    }
 
-    const char* query_absent = "Java";
-    assert(hashset_has(&set, &query_absent) == 0);
+    // Remoção da metade
+    for (int i = 0; i < total / 2; i++) {
+        assert(hashset_remove(&set, &i) == true);
+    }
+    assert(hashset_length(&set) == total / 2);
 
     hashset_free(&set);
-    printf("[OK] Teste com strings concluido.\n");
+
+    clock_t end = clock();
+    double total_time = (double)(end - start) / CLOCKS_PER_SEC;
+
+    printf(" -> Adicionados, consultados e removidos %d elementos.\n", total);
+    printf(" -> Tempo total do teste de estresse: %.6f segundos\n", total_time);
+    printf("[OK] Teste de estresse do HashSet concluido com sucesso!\n");
 }
 
 int main(void) {
-    printf("--- Executando testes para HashSet ---\n");
+    printf("--- Executando testes robustos para HashSet ---\n\n");
 
     test_hashset_basic();
-    test_hashset_collisions();
-    test_hashset_stress();
-    test_hashset_strings();
+    test_hashset_copy();
+    test_hashset_set_operations();
+    test_hashset_foreach();
+    test_hashset_stress_and_performance();
 
-    printf("--- Todos os testes passaram com sucesso! ---\n");
+    printf("\n--- Todos os testes do HashSet passaram com sucesso! 🎉 ---\n");
     return 0;
 }

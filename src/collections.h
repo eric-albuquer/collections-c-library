@@ -246,6 +246,55 @@ void hashset_add(HashSet* set, const void* element);
 bool hashset_has(HashSet* set, const void* element);
 bool hashset_remove(HashSet* set, const void* element);
 
+HashSet hashset_copy(HashSet* set);
+
+HashSet hashset_union(HashSet* a, HashSet* b);
+HashSet hashset_intersection(HashSet* a, HashSet* b);
+HashSet hashset_difference(HashSet* a, HashSet* b);
+
 void hashset_foreach(HashSet* set, void (*function)(const void*));
+
+// ==========================================================
+// FROZEN HASH SET
+// ==========================================================
+
+typedef struct FrozenHashSet {
+    HashSet _set;
+    uint64_t _checksum;
+} FrozenHashSet;
+
+FrozenHashSet frozenhashset_create(HashSet set);
+void frozenhashset_free(FrozenHashSet* set);
+
+int frozenhashset_length(FrozenHashSet* set);
+
+bool frozenhashset_has(FrozenHashSet* set, const void* element);
+bool frozenhashset_equals(FrozenHashSet* a, FrozenHashSet* b);
+uint64_t frozenhashset_hash(FrozenHashSet* f_set);
+
+FrozenHashSet frozenhashset_union(FrozenHashSet* a, FrozenHashSet* b);
+FrozenHashSet frozenhashset_intersection(FrozenHashSet* a, FrozenHashSet* b);
+FrozenHashSet frozenhashset_difference(FrozenHashSet* a, FrozenHashSet* b);
+
+void frozenhashset_foreach(FrozenHashSet* set, void (*function)(const void*));
+
+// ==========================================================
+// OBJECT POOL
+// ==========================================================
+
+typedef struct ObjectPool {
+    int _capacity;
+    int _obj_size;
+    int _used;
+
+    int _head;
+    unsigned char* _memory;
+} ObjectPool;
+
+ObjectPool objpool_create(int max_capacity, int obj_size);
+void objpool_free(ObjectPool* pool);
+
+void* objpool_malloc(ObjectPool* pool);
+void objpool_obj_free(ObjectPool* pool, void* obj);
 
 #endif

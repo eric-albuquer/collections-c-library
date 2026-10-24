@@ -1171,10 +1171,211 @@ bool hashset_remove(HashSet* set, const void* element) {
     return 0;
 }
 
+HashSet hashset_copy(HashSet* set) {
+    HashSet copy = hashset_create(set->_element_size, set->_equals, set->_hash);
+
+    for (int i = 0; i < set->_capacity; i++){
+        if (set->_states[i] != USED)
+            continue;
+
+        hashset_add(&copy, set->_elements + i * set->_element_size);
+    }
+    
+    return copy;
+}
+
+HashSet hashset_union(HashSet* a, HashSet* b) {
+    HashSet result = hashset_copy(a);
+    
+    for (int i = 0; i < b->_capacity; i++){
+        if (b->_states[i] != USED)
+            continue;
+
+        hashset_add(&result, b->_elements + i * b->_element_size);
+    }
+
+    return result;
+}
+
+HashSet hashset_intersection(HashSet* a, HashSet* b) {
+    HashSet* bigger;
+    HashSet* smaller;
+
+    if (a->_size >= b->_size) {
+        bigger = a;
+        smaller = b;
+    } else {
+        bigger = b;
+        smaller = a;
+    }
+
+    HashSet result = hashset_create(a->_element_size, a->_equals, a->_hash);
+
+    for (int i = 0; i < smaller->_capacity; i++){
+        if (smaller->_states[i] != USED)
+            continue;
+
+        const void* element = smaller->_elements + i * smaller->_element_size;
+        if (hashset_has(bigger, element))
+            hashset_add(&result, element);
+    }
+
+    return result;
+}
+
+HashSet hashset_difference(HashSet* a, HashSet* b) {
+    HashSet result = hashset_copy(a);
+
+    for (int i = 0; i < b->_capacity; i++){
+        if (b->_states[i] != USED)
+            continue;
+
+        hashset_remove(&result, b->_elements + i * b->_element_size);
+    }
+    
+    return result;
+}
+
 void hashset_foreach(HashSet* set, void (*function)(const void*)) {
     for (int i = 0; i < set->_capacity; i++){
         if (set->_states[i] != USED)
             continue;
         function(set->_elements + i * set->_element_size);
     }
+}
+
+// ==========================================================
+// FROZEN HASH SET
+// ==========================================================
+
+static inline uint64_t mix_bits(uint64_t val) {
+    val ^= val >> 30;
+    val *= 0xbf58476d1ce4e5b9ULL;
+    val ^= val >> 27;
+    val *= 0x94d049bb133111ebULL;
+    val ^= val >> 31;
+    return val;
+}
+
+static uint64_t hash_element_bytes(const unsigned char* data, size_t size) {
+    uint64_t hash = 14695981039346656037ULL;
+    for (size_t i = 0; i < size; i++) {
+        hash ^= data[i];
+        hash *= 1099511628211ULL;           
+    }
+    return hash;
+}
+
+FrozenHashSet frozenhashset_create(HashSet set) {
+    HashSet copy_set = hashset_copy(&set);
+    FrozenHashSet f_set = {
+        ._set = copy_set,
+        ._checksum = 0
+    };
+
+    for (int i = 0; i < copy_set._capacity; i++){
+        if (copy_set._states[i] != USED)
+            continue;
+        
+        uint64_t element_hash = hash_element_bytes(copy_set._elements + i * copy_set._element_size, copy_set._element_size);
+        f_set._checksum += mix_bits(element_hash);
+    }
+    
+    return f_set;
+}
+
+void frozenhashset_free(FrozenHashSet* f_set) {
+    hashset_free(&f_set->_set);
+}
+
+int frozenhashset_length(FrozenHashSet* f_set) {
+    return f_set->_set._size;
+}
+
+bool frozenhashset_has(FrozenHashSet* f_set, const void* element) {
+    return hashset_has(&f_set->_set, element);
+}
+
+bool frozenhashset_equals(FrozenHashSet* a, FrozenHashSet* b) {
+    if (a->_checksum != b->_checksum)
+        return 0;
+    if (a->_set._size != b->_set._size)
+        return 0;
+    if (a->_set._element_size != b->_set._element_size)
+        return 0;
+    
+    for (int i = 0; i < a->_set._capacity; i++){
+        if (a->_set._states[i] != USED)
+            continue;
+        
+        const void* element = a->_set._elements + i * a->_set._element_size;
+        if (!hashset_has(&b->_set, element))
+            return 0;
+    }
+    return 1;
+}
+
+uint64_t frozenhashset_hash(FrozenHashSet* f_set) {
+    return f_set->_checksum;
+}
+
+FrozenHashSet frozenhashset_union(FrozenHashSet* a, FrozenHashSet* b) {
+    HashSet u = hashset_union(&a->_set, &b->_set);
+    return frozenhashset_create(u);
+}
+
+FrozenHashSet frozenhashset_intersection(FrozenHashSet* a, FrozenHashSet* b) {
+    HashSet i = hashset_intersection(&a->_set, &b->_set);
+    return frozenhashset_create(i);
+}
+
+FrozenHashSet frozenhashset_difference(FrozenHashSet* a, FrozenHashSet* b) {
+    HashSet d = hashset_difference(&a->_set, &b->_set);
+    return frozenhashset_create(d);
+}
+
+void frozenhashset_foreach(FrozenHashSet* f_set, void (*function)(const void*)) {
+    hashset_foreach(&f_set->_set, function);
+}
+
+// ==========================================================
+// OBJECT POOL
+// ==========================================================
+
+ObjectPool objpool_create(int max_capacity, int obj_size) {
+    obj_size = int_max(obj_size, sizeof(int));
+    ObjectPool pool = {
+        ._capacity = max_capacity,
+        ._obj_size = obj_size,
+        ._used = 0,
+        ._head = 0,
+        ._memory = malloc(obj_size * max_capacity)
+    };
+
+    for (int i = 0; i < max_capacity - 1; i++){
+        *(int*)(pool._memory + i * obj_size) = i + 1;
+    }
+
+    return pool;
+}
+
+void objpool_free(ObjectPool* pool) {
+    free(pool->_memory);
+    pool->_memory = NULL;
+}
+
+void* objpool_malloc(ObjectPool* pool) {
+    if (pool->_used == pool->_capacity) 
+        return NULL;
+    
+    void* obj = pool->_memory + pool->_head * pool->_obj_size;
+    pool->_head = *(int*)obj;
+    pool->_used++;
+    return obj;
+}
+
+void objpool_obj_free(ObjectPool* pool, void* obj) {
+    *(int*)obj = pool->_head;
+    pool->_head = ((unsigned char*)obj - pool->_memory) / pool->_obj_size;
+    pool->_used--;
 }
