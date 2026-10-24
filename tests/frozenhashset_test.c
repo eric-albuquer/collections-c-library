@@ -29,7 +29,7 @@ void test_frozenhashset_basic(void) {
     hashset_add(&set, &v3);
 
     // 2. Congela o HashSet transformando-o em FrozenHashSet
-    FrozenHashSet fset = frozenhashset_create(set);
+    FrozenHashSet fset = frozenhashset_create(&set);
 
     assert(frozenhashset_length(&fset) == 3);
 
@@ -57,14 +57,14 @@ void test_frozenhashset_equals(void) {
     hashset_add(&setA, &x1);
     hashset_add(&setA, &x2);
     hashset_add(&setA, &x3);
-    FrozenHashSet fsetA = frozenhashset_create(setA);
+    FrozenHashSet fsetA = frozenhashset_create(&setA);
 
     // Conjunto B = {3, 1, 2} (mesmos elementos, ordem diferente no hash map)
     HashSet setB = hashset_create(sizeof(int), int_equals, int_hash);
     hashset_add(&setB, &x3);
     hashset_add(&setB, &x1);
     hashset_add(&setB, &x2);
-    FrozenHashSet fsetB = frozenhashset_create(setB);
+    FrozenHashSet fsetB = frozenhashset_create(&setB);
 
     // Conjunto C = {1, 2, 4} (diferente)
     HashSet setC = hashset_create(sizeof(int), int_equals, int_hash);
@@ -72,7 +72,7 @@ void test_frozenhashset_equals(void) {
     hashset_add(&setC, &x1);
     hashset_add(&setC, &x2);
     hashset_add(&setC, &x4);
-    FrozenHashSet fsetdataC = frozenhashset_create(setC);
+    FrozenHashSet fsetdataC = frozenhashset_create(&setC);
 
     // Validações de igualdade
     assert(frozenhashset_equals(&fsetA, &fsetB) == true);
@@ -97,7 +97,7 @@ void test_frozenhashset_set_operations(void) {
     hashset_add(&sa, &v1);
     hashset_add(&sa, &v2);
     hashset_add(&sa, &v3);
-    FrozenHashSet fa = frozenhashset_create(sa);
+    FrozenHashSet fa = frozenhashset_create(&sa);
 
     // B = {3, 4, 5}
     HashSet sb = hashset_create(sizeof(int), int_equals, int_hash);
@@ -105,7 +105,7 @@ void test_frozenhashset_set_operations(void) {
     hashset_add(&sb, &v3);
     hashset_add(&sb, &v4);
     hashset_add(&sb, &v5);
-    FrozenHashSet fb = frozenhashset_create(sb);
+    FrozenHashSet fb = frozenhashset_create(&sb);
 
     // 1. União (Union): {1, 2, 3, 4, 5}
     FrozenHashSet fu = frozenhashset_union(&fa, &fb);
@@ -146,7 +146,7 @@ void test_frozenhashset_foreach(void) {
         hashset_add(&set, &vals[i]);
     }
 
-    FrozenHashSet fset = frozenhashset_create(set);
+    FrozenHashSet fset = frozenhashset_create(&set);
 
     g_frozen_foreach_sum = 0;
     g_frozen_foreach_count = 0;
@@ -174,7 +174,7 @@ void test_frozenhashset_stress_and_performance(void) {
     clock_t start = clock();
 
     // Cria o frozen set (calculando o checksum em lote)
-    FrozenHashSet fset = frozenhashset_create(set);
+    FrozenHashSet fset = frozenhashset_create(&set);
     assert(frozenhashset_length(&fset) == total);
 
     // Testa consultas e integridade do checksum cacheado
@@ -186,7 +186,8 @@ void test_frozenhashset_stress_and_performance(void) {
     }
 
     // Testa igualdade rápida baseada no checksum pré-calculado
-    FrozenHashSet fset_copy = frozenhashset_create(hashset_copy(&fset._set));
+    HashSet copy = hashset_copy(&fset._set);
+    FrozenHashSet fset_copy = frozenhashset_create(&copy);
     assert(frozenhashset_equals(&fset, &fset_copy) == true);
 
     frozenhashset_free(&fset);

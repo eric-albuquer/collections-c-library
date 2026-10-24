@@ -88,6 +88,8 @@ bool string_contains(const String* a, const String* b);
 bool string_equals(const String* a, const String* b);
 uint64_t string_hash(String* string);
 
+void string_foreach(const String* string, void (*function)(int, char*));
+
 // ==========================================================
 // ARRAY LIST
 // ==========================================================
@@ -123,7 +125,8 @@ void arraylist_shuffle(ArrayList* list);
 
 ArrayList arraylist_copy(const ArrayList* list);
 void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*));
-void arraylist_foreach(ArrayList* list, void(*function)(int, const void*));
+int arraylist_bsearch(const ArrayList* list, const void* element, int(*cmp)(const void*, const void*));
+void arraylist_foreach(ArrayList* list, void(*function)(int, void*));
 
 // ==========================================================
 // ARRAY DEQUE
@@ -154,7 +157,7 @@ bool arraydeque_popleft(ArrayDeque* deque, void* out);
 
 ArrayDeque arraydeque_copy(const ArrayDeque* deque);
 
-void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, const void*));
+void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, void*));
 
 // ==========================================================
 // HEAP
@@ -180,7 +183,7 @@ bool heap_pop(Heap* heap, void* out);
 
 Heap heap_copy(const Heap* heap);
 
-void heap_foreach(Heap* heap, void(*function)(int, const void*));
+void heap_foreach(const Heap* heap, void(*function)(int, const void*));
 
 // ==========================================================
 // HASH MAP
@@ -220,9 +223,9 @@ bool hashmap_remove(HashMap* map, const void* key, void* out);
 
 HashMap hashmap_copy(const HashMap* map);
 
-void hashmap_keys(HashMap* map, void (*function)(const void*));
-void hashmap_values(HashMap* map, void (*function)(const void*));
-void hashmap_items(HashMap* map, void (*function)(const void*, const void*));
+void hashmap_keys(const HashMap* map, void (*function)(const void*));
+void hashmap_values(HashMap* map, void (*function)(void*));
+void hashmap_items(HashMap* map, void (*function)(const void*, void*));
 
 // ==========================================================
 // HASH SET
@@ -263,7 +266,7 @@ HashSet hashset_union(const HashSet* a, const HashSet* b);
 HashSet hashset_intersection(const HashSet* a, const HashSet* b);
 HashSet hashset_difference(const HashSet* a, const HashSet* b);
 
-void hashset_foreach(HashSet* set, void (*function)(const void*));
+void hashset_foreach(const HashSet* set, void (*function)(const void*));
 
 // ==========================================================
 // FROZEN HASH SET
@@ -275,7 +278,7 @@ typedef struct FrozenHashSet {
     uint64_t _checksum;
 } FrozenHashSet;
 
-FrozenHashSet frozenhashset_create(const HashSet set);
+FrozenHashSet frozenhashset_create(const HashSet* set);
 void frozenhashset_free(FrozenHashSet* set);
 
 int frozenhashset_length(const FrozenHashSet* set);
@@ -288,7 +291,7 @@ FrozenHashSet frozenhashset_union(const FrozenHashSet* a, const FrozenHashSet* b
 FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a, const FrozenHashSet* b);
 FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashSet* b);
 
-void frozenhashset_foreach(FrozenHashSet* set, void (*function)(const void*));
+void frozenhashset_foreach(const FrozenHashSet* set, void (*function)(const void*));
 
 // ==========================================================
 // OBJECT POOL
@@ -306,7 +309,25 @@ typedef struct ObjectPool {
 ObjectPool objpool_create(int max_capacity, int obj_size);
 void objpool_free(ObjectPool* pool);
 
+int objpool_remaining(const ObjectPool* pool);
+
 void* objpool_malloc(ObjectPool* pool);
 void objpool_free_obj(ObjectPool* pool, void* obj);
+
+// ==========================================================
+// ARENA POOL
+// ==========================================================
+
+typedef struct ArenaPool {
+    int _capacity;
+    int _used;
+
+    unsigned char* _memory;
+} ArenaPool;
+
+ArenaPool arenapool_create(int total_bytes);
+void arenapool_free(ArenaPool* arena);
+
+void* arenapool_malloc(ArenaPool* arena, int byte_count);
 
 #endif

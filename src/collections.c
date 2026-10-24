@@ -387,6 +387,12 @@ String string_concatenate(const String* a, const String* b) {
     return res;
 }
 
+void string_foreach(const String* string, void (*function)(int, char*)) {
+    for (int i = 0; i < string->_size - 1; i++){
+        function(i, string->_memory + i);  
+    }
+}
+
 // ==========================================================
 // ARRAY LIST
 // ==========================================================
@@ -560,6 +566,9 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
         insertion_sort(list, i, end, cmp);
     }
 
+    if (min_run == n)
+        return;
+
     unsigned char* aux = malloc(list->_element_size * list->_size);
     
     int size = min_run;
@@ -582,6 +591,12 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
     //qsort(list->_memory, list->_size, list->_element_size, cmp);
 }
 
+int arraylist_bsearch(const ArrayList* list, const void* element, int(*cmp)(const void*, const void*)) {
+    void* idx = bsearch(element, list->_memory, list->_size, list->_element_size, cmp);
+    if (idx == NULL) return -1;
+    return (((unsigned char*)idx) - list->_memory) / list->_element_size;
+}
+
 ArrayList arraylist_copy(const ArrayList* list) {
     ArrayList copy = {
         ._capacity = list->_capacity,
@@ -595,7 +610,7 @@ ArrayList arraylist_copy(const ArrayList* list) {
     return copy;
 }
 
-void arraylist_foreach(ArrayList* list, void(*function)(int, const void*)) {
+void arraylist_foreach(ArrayList* list, void(*function)(int, void*)) {
     for (int i = 0; i < list->_size; i++){
         function(i, list->_memory + i * list->_element_size);   
     }
@@ -728,7 +743,7 @@ ArrayDeque arraydeque_copy(const ArrayDeque* deque) {
     return copy;
 }
 
-void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, const void*)) {
+void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, void*)) {
     int curr = deque->_head;
     for (int i = 0; i < deque->_size; i++){
         function(i, deque->_memory + curr * deque->_element_size);
@@ -866,7 +881,7 @@ Heap heap_copy(const Heap* heap) {
     return copy;
 }
 
-void heap_foreach(Heap* heap, void(*function)(int, const void*)) {
+void heap_foreach(const Heap* heap, void(*function)(int, const void*)) {
     for (int i = 0; i < heap->_size; i++){
         function(i, heap->_memory + i * heap->_element_size);
     }
@@ -1067,7 +1082,7 @@ HashMap hashmap_copy(const HashMap* map) {
     return copy;
 }
 
-void hashmap_keys(HashMap* map, void (*function)(const void*)) {
+void hashmap_keys(const HashMap* map, void (*function)(const void*)) {
     for (int i = 0; i < map->_capacity; i++){
         if (map->_states[i] != USED)
             continue;
@@ -1075,7 +1090,7 @@ void hashmap_keys(HashMap* map, void (*function)(const void*)) {
     }
 }
 
-void hashmap_values(HashMap* map, void (*function)(const void*)) {
+void hashmap_values(HashMap* map, void (*function)(void*)) {
     for (int i = 0; i < map->_capacity; i++){
         if (map->_states[i] != USED)
             continue;
@@ -1083,7 +1098,7 @@ void hashmap_values(HashMap* map, void (*function)(const void*)) {
     }
 }
 
-void hashmap_items(HashMap* map, void (*function)(const void*, const void*)) {
+void hashmap_items(HashMap* map, void (*function)(const void*, void*)) {
     for (int i = 0; i < map->_capacity; i++){
         if (map->_states[i] != USED)
             continue;
@@ -1265,7 +1280,7 @@ HashSet hashset_intersection(const HashSet* a, const HashSet* b) {
     const HashSet* bigger;
     const HashSet* smaller;
 
-    if (a->_size >= b->_size) {
+    if (a->_capacity >= b->_capacity) {
         bigger = a;
         smaller = b;
     } else {
@@ -1300,7 +1315,7 @@ HashSet hashset_difference(const HashSet* a, const HashSet* b) {
     return result;
 }
 
-void hashset_foreach(HashSet* set, void (*function)(const void*)) {
+void hashset_foreach(const HashSet* set, void (*function)(const void*)) {
     for (int i = 0; i < set->_capacity; i++){
         if (set->_states[i] != USED)
             continue;
@@ -1330,8 +1345,8 @@ static uint64_t hash_element_bytes(const unsigned char* data, size_t size) {
     return hash;
 }
 
-FrozenHashSet frozenhashset_create(HashSet set) {
-    HashSet copy_set = hashset_copy(&set);
+FrozenHashSet frozenhashset_create(const HashSet* set) {
+    HashSet copy_set = hashset_copy(set);
     FrozenHashSet f_set = {
         ._set = copy_set,
         ._checksum_computed = 0,
@@ -1390,20 +1405,20 @@ uint64_t frozenhashset_hash(FrozenHashSet* f_set) {
 
 FrozenHashSet frozenhashset_union(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet u = hashset_union(&a->_set, &b->_set);
-    return frozenhashset_create(u);
+    return frozenhashset_create(&u);
 }
 
 FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet i = hashset_intersection(&a->_set, &b->_set);
-    return frozenhashset_create(i);
+    return frozenhashset_create(&i);
 }
 
 FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet d = hashset_difference(&a->_set, &b->_set);
-    return frozenhashset_create(d);
+    return frozenhashset_create(&d);
 }
 
-void frozenhashset_foreach(FrozenHashSet* f_set, void (*function)(const void*)) {
+void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const void*)) {
     hashset_foreach(&f_set->_set, function);
 }
 
@@ -1433,6 +1448,10 @@ void objpool_free(ObjectPool* pool) {
     pool->_memory = NULL;
 }
 
+int objpool_remaining(const ObjectPool* pool) {
+    return pool->_capacity - pool->_used;
+}
+
 void* objpool_malloc(ObjectPool* pool) {
     if (pool->_used == pool->_capacity) 
         return NULL;
@@ -1447,4 +1466,32 @@ void objpool_free_obj(ObjectPool* pool, void* obj) {
     *(int*)obj = pool->_head;
     pool->_head = ((unsigned char*)obj - pool->_memory) / pool->_obj_size;
     pool->_used--;
+}
+
+// ==========================================================
+// ARENA POOL
+// ==========================================================
+
+ArenaPool arenapool_create(int total_bytes) {
+    ArenaPool arena = {
+        ._capacity = total_bytes,
+        ._used = 0,
+        ._memory = malloc(total_bytes)
+    };
+
+    return arena;
+}
+
+void arenapool_free(ArenaPool* arena) {
+    free(arena->_memory);
+    arena->_memory = NULL;
+}
+
+void* arenapool_malloc(ArenaPool* arena, int byte_count) {
+    if (arena->_used + byte_count > arena->_capacity)
+        return NULL;
+
+    void* mem = arena->_memory + arena->_used;
+    arena->_used += byte_count;
+    return mem;
 }

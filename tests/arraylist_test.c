@@ -22,7 +22,7 @@ int int_asc_compare(const void* a, const void* b) {
 static int g_map_sum = 0;
 static int g_map_calls = 0;
 
-void accumulate_map_func(int idx, const void* element) {
+void accumulate_map_func(int idx, void* element) {
     (void)idx;
     g_map_sum += *(const int*)element;
     g_map_calls++;
@@ -210,6 +210,58 @@ void test_arraylist_sort_map_shuffle(void) {
     printf("[OK] Teste de sort, map e shuffle concluido.\n");
 }
 
+void test_arraylist_bsearch(void) {
+    // 1. Configuração inicial com array ordenado
+    ArrayList list = arraylist_create(sizeof(int), 0);
+    
+    int v1 = 10, v2 = 25, v3 = 42, v4 = 50, v5 = 99;
+    arraylist_append(&list, &v1);
+    arraylist_append(&list, &v2);
+    arraylist_append(&list, &v3);
+    arraylist_append(&list, &v4);
+    arraylist_append(&list, &v5);
+    
+    assert(arraylist_length(&list) == 5);
+
+    // 2. Testes de chaves existentes (Limites e Meio)
+    int chave_meio = 42;
+    int index_meio = arraylist_bsearch(&list, &chave_meio, int_asc_compare);
+    assert(index_meio == 2); // Deve retornar o índice exato
+
+    int chave_inicio = 10;
+    int index_inicio = arraylist_bsearch(&list, &chave_inicio, int_asc_compare);
+    assert(index_inicio == 0);
+
+    int chave_fim = 99;
+    int index_fim = arraylist_bsearch(&list, &chave_fim, int_asc_compare);
+    assert(index_fim == 4);
+
+    // 3. Testes de chaves inexistentes
+    int chave_menor = 5;
+    int index_menor = arraylist_bsearch(&list, &chave_menor, int_asc_compare);
+    assert(index_menor == -1); // Supondo retorno -1 para não encontrado
+
+    int chave_entre = 30;
+    int index_entre = arraylist_bsearch(&list, &chave_entre, int_asc_compare);
+    assert(index_entre == -1);
+
+    int chave_maior = 150;
+    int index_maior = arraylist_bsearch(&list, &chave_maior, int_asc_compare);
+    assert(index_maior == -1);
+
+    // 4. Teste em lista vazia (Edge case)
+    ArrayList empty_list = arraylist_create(sizeof(int), 0);
+    int chave_busca = 42;
+    int index_vazia = arraylist_bsearch(&empty_list, &chave_busca, int_asc_compare);
+    assert(index_vazia == -1);
+
+    // Limpeza da memória
+    arraylist_free(&list);
+    arraylist_free(&empty_list);
+
+    printf("[OK] Teste de busca binaria (bsearch) concluido.\n");
+}
+
 // Teste 6: Stress e Performance (Benchmark)
 void test_arraylist_performance_and_stress(void) {
     printf("[BENCHMARK] Iniciando teste de estresse e performance para ArrayList...\n");
@@ -256,6 +308,7 @@ int main(void) {
     test_arraylist_creation_and_basic();
     test_arraylist_get_set();
     test_arraylist_insert_remove_index();
+    test_arraylist_bsearch();
     test_arraylist_swap_and_clear();
     test_arraylist_sort_map_shuffle();
     test_arraylist_performance_and_stress();
