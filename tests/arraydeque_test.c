@@ -31,7 +31,7 @@ void test_arraydeque_basic(void) {
     assert(arraydeque_popleft(&deque, &out) == 0);
     assert(arraydeque_pop(&deque, &out) == 0);
 
-    arraydeque_free(deque);
+    arraydeque_free(&deque);
     printf("[OK] Teste basico concluido.\n");
 }
 
@@ -59,7 +59,7 @@ void test_arraydeque_stack_and_deque_ops(void) {
 
     assert(deque._size == 1);
 
-    arraydeque_free(deque);
+    arraydeque_free(&deque);
     printf("[OK] Teste de operacoes combinadas (appendleft/pop) concluido.\n");
 }
 
@@ -85,7 +85,7 @@ void test_arraydeque_stress_and_resize(void) {
 
     assert(deque._size == 0);
 
-    arraydeque_free(deque);
+    arraydeque_free(&deque);
     printf("[OK] Teste de carga e redimensionamento concluido.\n");
 }
 
@@ -111,7 +111,7 @@ void test_arraydeque_generic_types(void) {
     assert(arraydeque_popleft(&deque, &out) == 1);
     assert(out.x == 30 && out.y == 40);
 
-    arraydeque_free(deque);
+    arraydeque_free(&deque);
     printf("[OK] Teste com tipos genericos (structs) concluido.\n");
 }
 

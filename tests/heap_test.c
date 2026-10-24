@@ -63,7 +63,7 @@ void test_heap_min_int(void) {
     // Teste de underflow (pop em heap vazia)
     assert(heap_pop(&heap, &out) == 0);
 
-    heap_free(heap);
+    heap_free(&heap);
     printf("[OK] Teste Min-Heap de inteiros concluido.\n");
 }
 
@@ -87,7 +87,7 @@ void test_heap_max_int(void) {
         assert(out == ordem_esperada[i]);
     }
 
-    heap_free(heap);
+    heap_free(&heap);
     printf("[OK] Teste Max-Heap de inteiros concluido.\n");
 }
 
@@ -112,7 +112,7 @@ void test_heap_stress(void) {
 
     assert(heap._size == 0);
 
-    heap_free(heap);
+    heap_free(&heap);
     printf("[OK] Teste de carga e redimensionamento concluido.\n");
 }
 
@@ -148,7 +148,7 @@ void test_heap_structs(void) {
     assert(heap_pop(&heap, &out) == 1);
     assert(out.prioridade == 1);
 
-    heap_free(heap);
+    heap_free(&heap);
     printf("[OK] Teste com structs genéricas concluido.\n");
 }
 

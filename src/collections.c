@@ -5,49 +5,306 @@
 #define START_CAPACITY 64
 
 // ==========================================================
+// EQUAL GENERIC FUNCTIONS
+// ==========================================================
+
+bool int_equals(const void* a, const void* b) {
+    if (a == b) return 1;
+    if (a == NULL || b == NULL) return 0;
+    return *(const int*)a == *(const int*)b;
+}
+
+bool long_long_equals(const void* a, const void* b) {
+    if (a == b) return 1;
+    if (a == NULL || b == NULL) return 0;
+    return *(const long long*)a == *(const long long*)b;
+}
+
+bool float_equals(const void* a, const void* b) {
+    if (a == b) return 1;
+    if (a == NULL || b == NULL) return 0;
+    return *(const float*)a == *(const float*)b;
+}
+bool double_equals(const void* a, const void* b) {
+    if (a == b) return 1;
+    if (a == NULL || b == NULL) return 0;
+    return *(const double*)a == *(const double*)b;
+}
+
+bool char_equals(const void* a, const void* b) {
+    if (a == b) return 1;
+    if (a == NULL || b == NULL) return 0;
+    return *(const char*)a == *(const char*)b;
+}
+
+bool str_equals(const void* a, const void* b) {
+    if (a == b) return 1;
+    if (a == NULL || b == NULL) return 0;
+    return strcmp((const char*)a, (const char*)b) == 0;
+}
+
+// ==========================================================
+// HASH GENERIC FUNCTIONS
+// ==========================================================
+
+uint64_t char_hash(const void* value) {
+    if (value == NULL) return 0;
+    return (uint64_t)(unsigned char)(*(const char*)value);
+}
+
+uint64_t long_long_hash(const void* value) {
+    if (value == NULL) return 0;
+    long long val = *(const long long*)value;
+    uint64_t x = (uint64_t)val;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    return x ^ (x >> 31);
+}
+
+uint64_t int_hash(const void* value) {
+    if (value == NULL) return 0;
+    int val = *(const int*)value;
+    uint64_t x = (uint32_t)val;
+    x = (x ^ (x >> 15)) * 0x2efa61cb23f12ee7ULL;
+    x = (x ^ (x >> 13)) * 0x123456789abcdef0ULL;
+    return x ^ (x >> 17);
+}
+
+uint64_t float_hash(const void* value) {
+    if (value == NULL) return 0;
+    float val = *(const float*)value;
+    union {
+        float f;
+        uint32_t i;
+    } u;
+    u.f = val;
+    uint64_t x = u.i;
+    x = (x ^ (x >> 15)) * 0x2efa61cb23f12ee7ULL;
+    x = (x ^ (x >> 13)) * 0x123456789abcdef0ULL;
+    return x ^ (x >> 17);
+}
+
+uint64_t double_hash(const void* value) {
+    if (value == NULL) return 0;
+    double val = *(const double*)value;
+    union {
+        double d;
+        uint64_t i;
+    } u;
+    u.d = val;
+    uint64_t x = u.i;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    return x ^ (x >> 31);
+}
+
+uint64_t str_hash(const void* value) {
+    if (value == NULL) return 0;
+    const char* str = (const char*)value;
+    
+    uint64_t hash = 14695981039346656037ULL;
+    int c;
+
+    while ((c = (unsigned char)*str++)) {
+        hash ^= c;
+        hash *= 1099511628211ULL;
+    }
+
+    return hash;
+}
+
+// ==========================================================
+// STRING
+// ==========================================================
+
+static inline void string_resize(String* s) {
+    s->_capacity <<= 1;
+    s->_memory = realloc(s->_memory, s->_capacity);
+}
+
+String string_create(char* str) {
+    String string = {
+        ._capacity = START_CAPACITY,
+        ._hash_computed = 0,
+        ._size = 0,
+        ._memory = malloc(START_CAPACITY),
+    };
+
+    int idx = 0;
+    char c;
+    do {
+        if (idx == string._capacity)
+            string_resize(&string);
+
+        c = str[idx];
+        string._memory[idx] = c;
+        idx++;
+    } while (c != 0);
+    string._size = idx;
+
+    return string;
+}
+
+void string_free(String* string) {
+    free(string->_memory);
+    string->_memory = NULL;
+}
+
+char* string_get_str(String* string) {
+    return string->_memory;
+}
+
+int string_length(String* string) {
+    return string->_size - 1;
+}
+
+void string_append_char(String* string, char chr) {
+    string->_hash_computed = false;
+    if (string->_size == string->_capacity)
+        string_resize(string);
+    
+    string->_memory[string->_size - 1] = chr;
+    string->_memory[string->_size] = 0;
+    string->_size++;
+}
+
+void string_clear(String* string) {
+    string->_hash_computed = false;
+    string->_memory[0] = 0;
+    string->_size = 1;
+}
+
+String string_copy(String* string) {
+    String copy = string_create(string->_memory);
+    if (string->_hash_computed) {
+        copy._hash = string->_hash;
+        copy._hash_computed = 1;
+    }
+        
+    return copy;
+}
+
+int string_compare(String* a, String* b) {
+    return strcmp(a->_memory, b->_memory);
+}
+
+void string_append(String* a, String* b) {
+    a->_hash_computed = false;
+    int idx = --a->_size;
+    for (int i = 0; i < b->_size; i++){
+        if (idx == a->_capacity)
+            string_resize(a);
+        
+        a->_memory[idx] = b->_memory[i];
+        idx++;
+    }
+    a->_size += b->_size;
+}
+
+bool string_equals(String* a, String* b) {
+    if (a->_hash_computed && b->_hash_computed && a->_hash != b->_hash)
+        return 0;
+    return str_equals(a->_memory, b->_memory);
+}
+
+uint64_t string_hash(String* string) {
+    if (string->_hash_computed)
+        return string->_hash;
+    string->_hash = str_hash(string->_memory);
+    string->_hash_computed = 1;
+    return string->_hash;
+}
+
+// ==========================================================
 // ARRAY LIST
 // ==========================================================
 
-ArrayList arraylist_create(int element_size, int initial_size) {
-    int initial_capacity = initial_size < START_CAPACITY ? START_CAPACITY : initial_size;
+static inline void arraylist_resize(ArrayList* list){
+    list->_capacity <<= 1;
+    list->_memory = realloc(list->_memory, list->_capacity * list->_element_size);
+}
+
+ArrayList arraylist_create(int element_size, int initial_capacity) {
+    initial_capacity = initial_capacity < START_CAPACITY ? START_CAPACITY : initial_capacity;
     ArrayList list = {
         ._capacity = initial_capacity,
         ._element_size = element_size,
-        ._size = initial_size,
+        ._size = 0,
+        ._swap_buffer = malloc(element_size),
         ._memory = malloc(initial_capacity * element_size)
     };
 
     return list;
 }
 
-void arraylist_free(ArrayList list) {
-    free(list._memory);
+void arraylist_free(ArrayList* list) {
+    free(list->_swap_buffer);
+    free(list->_memory);
+    list->_swap_buffer = NULL;
+    list->_memory = NULL;
 }
 
-int arraylist_get(ArrayList list, int idx, void* out) {
-    if ((unsigned int)idx >= list._size)
+int arraylist_length(ArrayList* list) {
+    return list->_size;
+}
+
+bool arraylist_get(ArrayList* list, int idx, void* out) {
+    if ((unsigned int)idx >= list->_size)
         return 0;
-    memcpy(out, list._memory + idx * list._element_size, list._element_size);
+    memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
     return 1;
 }
 
-int arraylist_set(ArrayList* list, int idx, void* element) {
+bool arraylist_set(ArrayList* list, int idx, void* element) {
     if ((unsigned int)idx >= list->_size)
         return 0;
     memcpy(list->_memory + idx * list->_element_size, element, list->_element_size);
     return 1;
 }
 
-void arraylist_append(ArrayList* list, void* element) {
-    if (list->_size == list->_capacity) {
-        list->_capacity <<= 1;
-        list->_memory = realloc(list->_memory, list->_capacity * list->_element_size);
+bool arraylist_insert_index(ArrayList* list, int idx, void* element) {
+    if ((unsigned int)idx > list->_size)
+        return 0;
+
+    if (list->_size == list->_capacity)
+        arraylist_resize(list);
+
+    for (int i = list->_size; i > idx; i--){
+        memcpy(list->_memory + i * list->_element_size, list->_memory + (i - 1) * list->_element_size, list->_element_size);
     }
+
+    memcpy(list->_memory + idx * list->_element_size, element, list->_element_size);
+    list->_size++;
+    return 1;
+}
+
+bool arraylist_remove_index(ArrayList* list, int idx, void* out) {
+    if((unsigned int)idx >= list->_size)
+        return 0;
+
+    memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
+    list->_size--;
+
+    for (int i = idx; i < list->_size; i++){
+        memcpy(list->_memory + i * list->_element_size, list->_memory + (i + 1) * list->_element_size, list->_element_size);
+    }
+    
+    return 1;
+}
+
+void arraylist_clear(ArrayList* list) {
+    list->_size = 0;
+}
+
+void arraylist_append(ArrayList* list, void* element) {
+    if (list->_size == list->_capacity)
+        arraylist_resize(list);
 
     memcpy(list->_memory + list->_size * list->_element_size, element, list->_element_size);
     list->_size++;
 }
-int arraylist_pop(ArrayList* list, void* out) {
+
+bool arraylist_pop(ArrayList* list, void* out) {
     if (list->_size == 0) 
         return 0;
 
@@ -56,13 +313,29 @@ int arraylist_pop(ArrayList* list, void* out) {
     return 1;
 }
 
-void arraylist_sort(ArrayList list, int(*cmp)(const void*, const void*)) {
-    qsort(list._memory, list._size, list._element_size, cmp);
+bool arraylist_swap(ArrayList* list, int i, int j) {
+    if ((unsigned int)i >= list->_size || (unsigned int)j >= list->_size || i == j)
+        return 0;
+    memcpy(list->_swap_buffer, list->_memory + i * list->_element_size, list->_element_size);
+    memcpy(list->_memory + i * list->_element_size, list->_memory + j * list->_element_size, list->_element_size);
+    memcpy(list->_memory + j * list->_element_size, list->_swap_buffer, list->_element_size);
+    return 1;
 }
 
-void arraylist_map(ArrayList list, void(*function)(int, const void*)) {
-    for (int i = 0; i < list._size; i++){
-        function(i, list._memory + i * list._element_size);   
+void arraylist_shuffle(ArrayList* list) {
+    for (int i = list->_size - 1; i > 0; i--){
+        int idx = rand() % (i + 1);
+        arraylist_swap(list, i, idx);
+    }
+}
+
+void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
+    qsort(list->_memory, list->_size, list->_element_size, cmp);
+}
+
+void arraylist_map(ArrayList* list, void(*function)(int, const void*)) {
+    for (int i = 0; i < list->_size; i++){
+        function(i, list->_memory + i * list->_element_size);   
     }
 }
 
@@ -110,8 +383,13 @@ ArrayDeque arraydeque_create(int element_size) {
     return deque;
 }
 
-void arraydeque_free(ArrayDeque deque) {
-    free(deque._memory);
+void arraydeque_free(ArrayDeque* deque) {
+    free(deque->_memory);
+    deque->_memory = NULL;
+}
+
+int arraydeque_length(ArrayDeque* deque) {
+    return deque->_size;
 }
 
 void arraydeque_append(ArrayDeque* deque, void* element) {
@@ -143,7 +421,7 @@ void arraydeque_appendleft(ArrayDeque* deque, void* element) {
     deque->_size++;
 }
 
-int arraydeque_pop(ArrayDeque* deque, void* out) {
+bool arraydeque_pop(ArrayDeque* deque, void* out) {
     if (deque->_size == 0) 
         return 0;
 
@@ -159,7 +437,7 @@ int arraydeque_pop(ArrayDeque* deque, void* out) {
     return 1;
 }
 
-int arraydeque_popleft(ArrayDeque* deque, void* out) {
+bool arraydeque_popleft(ArrayDeque* deque, void* out) {
     if (deque->_size == 0) 
         return 0;
 
@@ -195,8 +473,13 @@ Heap heap_create(int element_size, int (*cmp)(const void*, const void*)) {
     return heap;
 }
 
-void heap_free(Heap heap) {
-    free(heap._memory);
+void heap_free(Heap* heap) {
+    free(heap->_memory);
+    heap->_memory = NULL;
+}
+
+int heap_length(Heap* heap) {
+    return heap->_size;
 }
 
 void heap_push(Heap* heap, void* element) {
@@ -225,7 +508,7 @@ void heap_push(Heap* heap, void* element) {
     heap->_size++;
 }
 
-int heap_pop(Heap* heap, void* out) {
+bool heap_pop(Heap* heap, void* out) {
     if (heap->_size == 0)
         return 0; 
 
@@ -294,15 +577,15 @@ int heap_pop(Heap* heap, void* out) {
 #define REMOVED 1
 #define USED 2
 
-static inline unsigned int double_hash(unsigned int hash) {
-    return (hash * 2654435761U) | 1;
+static inline uint64_t double_hash_step(uint64_t hash) {
+    return (hash * 0x9e3779b97f4a7c15ULL) | 1;
 }
 
 static inline void hashmap_resize(HashMap* map) {
     int new_capacity = map->_capacity << 1;
     int new_mask = new_capacity - 1;
 
-    unsigned int* new_hash_cache = malloc(sizeof(unsigned int) * new_capacity);
+    uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
     unsigned char* new_states = calloc(new_capacity, sizeof(unsigned char));
     unsigned char* new_keys = malloc(map->_key_size * new_capacity);
     unsigned char* new_values = malloc(map->_value_size * new_capacity);
@@ -311,10 +594,10 @@ static inline void hashmap_resize(HashMap* map) {
         if (map->_states[i] != USED) 
             continue;
         
-        unsigned int hash = map->_hash_cache[i];
-        unsigned int step = double_hash(hash);
+        uint64_t hash = map->_hash_cache[i];
+        uint64_t step = double_hash_step(hash);
 
-        unsigned int idx = hash & new_mask;
+        uint64_t idx = hash & new_mask;
 
         for (int j = 0; j < new_capacity; j++){
             if (new_states[idx] == EMPTY) {
@@ -352,8 +635,8 @@ static inline void hashmap_resize(HashMap* map) {
 HashMap hashmap_create(
     int key_size,
     int value_size,
-    int (*equals)(const void*, const void*),
-    unsigned int (*hash)(const void*)
+    bool (*equals)(const void*, const void*),
+    uint64_t (*hash)(const void*)
 ) {
     HashMap map = {
         ._capacity = START_CAPACITY,
@@ -364,7 +647,7 @@ HashMap hashmap_create(
         ._equals = equals,
         ._hash = hash,
         ._size = 0,
-        ._hash_cache = malloc(sizeof(unsigned int) * START_CAPACITY),
+        ._hash_cache = malloc(sizeof(uint64_t) * START_CAPACITY),
         ._states = calloc(START_CAPACITY, sizeof(unsigned char)),
         ._keys = malloc(START_CAPACITY * key_size),
         ._values = malloc(START_CAPACITY * value_size)
@@ -373,21 +656,29 @@ HashMap hashmap_create(
     return map;
 }
 
-void hashmap_free(HashMap map) {
-    free(map._states);
-    free(map._keys);
-    free(map._values);
-    free(map._hash_cache);
+void hashmap_free(HashMap* map) {
+    free(map->_states);
+    free(map->_keys);
+    free(map->_values);
+    free(map->_hash_cache);
+    map->_states = NULL;
+    map->_keys = NULL;
+    map->_values = NULL;
+    map->_hash_cache = NULL;
 }
 
-int hashmap_set(HashMap* map, const void* key, const void* value, void* old_value) {
+int hashmap_length(HashMap* map) {
+    return map->_size;
+}
+
+void hashmap_set(HashMap* map, const void* key, const void* value, void* old_value) {
     if (map->_size == map->_max_elements)
         hashmap_resize(map);
 
-    unsigned int hash = map->_hash(key);
-    unsigned int step = double_hash(hash);
+    uint64_t hash = map->_hash(key);
+    uint64_t step = double_hash_step(hash);
 
-    unsigned int idx = hash & map->_mask;
+    uint64_t idx = hash & map->_mask;
     int location = -1;
 
     for (int i = 0; i < map->_capacity; i++){
@@ -399,7 +690,7 @@ int hashmap_set(HashMap* map, const void* key, const void* value, void* old_valu
                 memcpy(old_value, ptr, map->_value_size);
 
             memcpy(ptr, value, map->_value_size);
-            return 1;
+            return;
         }
         if (map->_states[idx] == EMPTY)
             break;
@@ -411,36 +702,35 @@ int hashmap_set(HashMap* map, const void* key, const void* value, void* old_valu
     map->_hash_cache[location] = hash;
     map->_states[location] = USED;
     map->_size++;
-    return 0;
 }
 
-int hashmap_get(HashMap map, const void* key, void* out) {
-    unsigned int hash = map._hash(key);
-    unsigned int step = double_hash(hash);
+bool hashmap_get(HashMap* map, const void* key, void* out) {
+    uint64_t hash = map->_hash(key);
+    uint64_t step = double_hash_step(hash);
 
-    unsigned int idx = hash & map._mask;
+    uint64_t idx = hash & map->_mask;
 
-    for (int i = 0; i < map._capacity; i++){
-        if (map._states[idx] == EMPTY)
+    for (int i = 0; i < map->_capacity; i++){
+        if (map->_states[idx] == EMPTY)
             return 0;
-        if (map._states[idx] == USED && map._hash_cache[idx] == hash && map._equals(map._keys + idx * map._key_size, key)) {
+        if (map->_states[idx] == USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
             memcpy(
                 out,
-                map._values + idx * map._value_size,
-                map._value_size
+                map->_values + idx * map->_value_size,
+                map->_value_size
             );
             return 1;
         }
-        idx = (idx + step) & map._mask;
+        idx = (idx + step) & map->_mask;
     }
     return 0;
 }
 
-int hashmap_remove(HashMap* map, const void* key, void* out) {
-    unsigned int hash = map->_hash(key);
-    unsigned int step = double_hash(hash);
+bool hashmap_remove(HashMap* map, const void* key, void* out) {
+    uint64_t hash = map->_hash(key);
+    uint64_t step = double_hash_step(hash);
 
-    unsigned int idx = hash & map->_mask;
+    uint64_t idx = hash & map->_mask;
 
     for (int i = 0; i < map->_capacity; i++){
         if (map->_states[idx] == EMPTY)
@@ -468,7 +758,7 @@ static inline void hashset_resize(HashSet* set) {
     int new_capacity = set->_capacity << 1;
     int new_mask = new_capacity - 1;
 
-    unsigned int* new_hash_cache = malloc(sizeof(unsigned int) * new_capacity);
+    uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
     unsigned char* new_states = calloc(new_capacity, sizeof(unsigned char));
     unsigned char* new_elements = malloc(set->_element_size * new_capacity);
 
@@ -476,10 +766,10 @@ static inline void hashset_resize(HashSet* set) {
         if (set->_states[i] != USED) 
             continue;
         
-        unsigned int hash = set->_hash_cache[i];
-        unsigned int step = double_hash(hash);
+        uint64_t hash = set->_hash_cache[i];
+        uint64_t step = double_hash_step(hash);
 
-        unsigned int idx = hash & new_mask;
+        uint64_t idx = hash & new_mask;
 
         for (int j = 0; j < new_capacity; j++){
             if (new_states[idx] == EMPTY) {
@@ -509,8 +799,8 @@ static inline void hashset_resize(HashSet* set) {
 
 HashSet hashset_create(
     int element_size,
-    int (*equals)(const void*, const void*),
-    unsigned int (*hash)(const void*)
+    bool (*equals)(const void*, const void*),
+    uint64_t (*hash)(const void*)
 ) {
     HashSet set = {
         ._capacity = START_CAPACITY,
@@ -520,7 +810,7 @@ HashSet hashset_create(
         ._equals = equals,
         ._hash = hash,
         ._size = 0,
-        ._hash_cache = malloc(sizeof(unsigned int) * START_CAPACITY),
+        ._hash_cache = malloc(sizeof(uint64_t) * START_CAPACITY),
         ._states = calloc(START_CAPACITY, sizeof(unsigned char)),
         ._elements = malloc(element_size * START_CAPACITY)
     };
@@ -528,20 +818,27 @@ HashSet hashset_create(
     return set;
 }
 
-void hashset_free(HashSet set) {
-    free(set._states);
-    free(set._hash_cache);
-    free(set._elements);
+void hashset_free(HashSet* set) {
+    free(set->_states);
+    free(set->_hash_cache);
+    free(set->_elements);
+    set->_states = NULL;
+    set->_hash_cache = NULL;
+    set->_elements = NULL;
+}
+
+int hashset_length(HashSet* set) {
+    return set->_size;
 }
 
 void hashset_add(HashSet* set, const void* element) {
     if (set->_size == set->_max_elements)
         hashset_resize(set);
 
-    unsigned int hash = set->_hash(element);
-    unsigned int step = double_hash(hash);
+    uint64_t hash = set->_hash(element);
+    uint64_t step = double_hash_step(hash);
 
-    unsigned int idx = hash & set->_mask;
+    uint64_t idx = hash & set->_mask;
     int location = -1;
 
     for (int i = 0; i < set->_capacity; i++){
@@ -561,28 +858,28 @@ void hashset_add(HashSet* set, const void* element) {
     set->_size++;
 }
 
-int hashset_has(HashSet set, const void* element) {
-    unsigned int hash = set._hash(element);
-    unsigned int step = double_hash(hash);
+bool hashset_has(HashSet* set, const void* element) {
+    uint64_t hash = set->_hash(element);
+    uint64_t step = double_hash_step(hash);
 
-    unsigned int idx = hash & set._mask;
+    uint64_t idx = hash & set->_mask;
 
-    for (int i = 0; i < set._capacity; i++){
-        if (set._states[idx] == EMPTY)
+    for (int i = 0; i < set->_capacity; i++){
+        if (set->_states[idx] == EMPTY)
             return 0;
-        if (set._states[idx] == USED && set._hash_cache[idx] == hash && set._equals(set._elements + idx * set._element_size, element)) {
+        if (set->_states[idx] == USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
             return 1;
         }
-        idx = (idx + step) & set._mask;
+        idx = (idx + step) & set->_mask;
     }
     return 0;
 }
 
-int hashset_remove(HashSet* set, const void* element) {
-    unsigned int hash = set->_hash(element);
-    unsigned int step = double_hash(hash);
+bool hashset_remove(HashSet* set, const void* element) {
+    uint64_t hash = set->_hash(element);
+    uint64_t step = double_hash_step(hash);
 
-    unsigned int idx = hash & set->_mask;
+    uint64_t idx = hash & set->_mask;
 
     for (int i = 0; i < set->_capacity; i++){
         if (set->_states[idx] == EMPTY)
