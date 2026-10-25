@@ -3,6 +3,12 @@
 #include <string.h>
 
 #define START_CAPACITY 64
+#define START_TRIE_CAPACITY 1024
+#define ALPHABET_SIZE 256
+#define HASHMAP_FACTOR 0.75f
+#define HASHTABLE_EMPTY 0
+#define HASHTABLE_REMOVED 1
+#define HASHTABLE_USED 2
 
 // ==========================================================
 // EQUAL GENERIC FUNCTIONS
@@ -235,8 +241,6 @@ char char_max(char a, char b) {
 // ==========================================================
 // STRING
 // ==========================================================
-
-#define ALPHABET_SIZE 256
 
 static inline void string_resize(String* s) {
     s->_capacity <<= 1;
@@ -887,11 +891,6 @@ void heap_foreach(const Heap* heap, void(*function)(int, const void*)) {
 // HASH MAP
 // ==========================================================
 
-#define HASHMAP_FACTOR 0.75f
-#define EMPTY 0
-#define REMOVED 1
-#define USED 2
-
 static inline uint64_t double_hash_step(uint64_t hash) {
     return (hash * 0x9e3779b97f4a7c15ULL) | 1;
 }
@@ -906,7 +905,7 @@ static inline void hashmap_resize(HashMap* map) {
     uint8_t* new_values = malloc(map->_value_size * new_capacity);
 
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[i] != USED) 
+        if (map->_states[i] != HASHTABLE_USED) 
             continue;
         
         uint64_t hash = map->_hash_cache[i];
@@ -915,8 +914,8 @@ static inline void hashmap_resize(HashMap* map) {
         uint64_t idx = hash & new_mask;
 
         for (int j = 0; j < new_capacity; j++){
-            if (new_states[idx] == EMPTY) {
-                new_states[idx] = USED;
+            if (new_states[idx] == HASHTABLE_EMPTY) {
+                new_states[idx] = HASHTABLE_USED;
                 new_hash_cache[idx] = hash;
                 memcpy(
                     new_keys + idx * map->_key_size,
@@ -997,9 +996,9 @@ void hashmap_set(HashMap* map, const void* key, const void* value, void* old_val
     int location = -1;
 
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[idx] != USED && location == -1) {
+        if (map->_states[idx] != HASHTABLE_USED && location == -1) {
             location = idx;
-        } else if (map->_states[idx] == USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + map->_key_size * idx, key)) {
+        } else if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + map->_key_size * idx, key)) {
             void* ptr = map->_values + idx * map->_value_size;
             if (old_value)
                 memcpy(old_value, ptr, map->_value_size);
@@ -1007,7 +1006,7 @@ void hashmap_set(HashMap* map, const void* key, const void* value, void* old_val
             memcpy(ptr, value, map->_value_size);
             return;
         }
-        if (map->_states[idx] == EMPTY)
+        if (map->_states[idx] == HASHTABLE_EMPTY)
             break;
         idx = (idx + step) & map->_mask;
     }
@@ -1015,7 +1014,7 @@ void hashmap_set(HashMap* map, const void* key, const void* value, void* old_val
     memcpy(map->_keys + location * map->_key_size, key, map->_key_size);
     memcpy(map->_values + location * map->_value_size, value, map->_value_size);
     map->_hash_cache[location] = hash;
-    map->_states[location] = USED;
+    map->_states[location] = HASHTABLE_USED;
     map->_size++;
 }
 
@@ -1026,9 +1025,9 @@ bool hashmap_get(const HashMap* map, const void* key, void* out) {
     uint64_t idx = hash & map->_mask;
 
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[idx] == EMPTY)
+        if (map->_states[idx] == HASHTABLE_EMPTY)
             return 0;
-        if (map->_states[idx] == USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
+        if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
             memcpy(
                 out,
                 map->_values + idx * map->_value_size,
@@ -1048,15 +1047,15 @@ bool hashmap_remove(HashMap* map, const void* key, void* out) {
     uint64_t idx = hash & map->_mask;
 
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[idx] == EMPTY)
+        if (map->_states[idx] == HASHTABLE_EMPTY)
             return 0;
-        if (map->_states[idx] == USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
+        if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
             memcpy(
                 out,
                 map->_values + idx * map->_value_size,
                 map->_value_size
             );
-            map->_states[idx] = REMOVED;
+            map->_states[idx] = HASHTABLE_REMOVED;
             map->_size--;
             return 1;
         }
@@ -1069,7 +1068,7 @@ HashMap hashmap_copy(const HashMap* map) {
     HashMap copy = hashmap_create(map->_key_size, map->_value_size, map->_equals, map->_hash);
 
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[i] != USED) 
+        if (map->_states[i] != HASHTABLE_USED) 
             continue;
         
         hashmap_set(&copy, map->_keys + i * map->_key_size, map->_values + i * map->_value_size, NULL);
@@ -1080,7 +1079,7 @@ HashMap hashmap_copy(const HashMap* map) {
 
 void hashmap_keys(const HashMap* map, void (*function)(const void*)) {
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[i] != USED)
+        if (map->_states[i] != HASHTABLE_USED)
             continue;
         function(map->_keys + i * map->_key_size);
     }
@@ -1088,7 +1087,7 @@ void hashmap_keys(const HashMap* map, void (*function)(const void*)) {
 
 void hashmap_values(HashMap* map, void (*function)(void*)) {
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[i] != USED)
+        if (map->_states[i] != HASHTABLE_USED)
             continue;
         function(map->_values + i * map->_value_size);
     }
@@ -1096,7 +1095,7 @@ void hashmap_values(HashMap* map, void (*function)(void*)) {
 
 void hashmap_items(HashMap* map, void (*function)(const void*, void*)) {
     for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[i] != USED)
+        if (map->_states[i] != HASHTABLE_USED)
             continue;
         function(map->_keys + i * map->_key_size, map->_values + i * map->_value_size);
     }
@@ -1115,7 +1114,7 @@ static inline void hashset_resize(HashSet* set) {
     uint8_t* new_elements = malloc(set->_element_size * new_capacity);
 
     for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[i] != USED) 
+        if (set->_states[i] != HASHTABLE_USED) 
             continue;
         
         uint64_t hash = set->_hash_cache[i];
@@ -1124,8 +1123,8 @@ static inline void hashset_resize(HashSet* set) {
         uint64_t idx = hash & new_mask;
 
         for (int j = 0; j < new_capacity; j++){
-            if (new_states[idx] == EMPTY) {
-                new_states[idx] = USED;
+            if (new_states[idx] == HASHTABLE_EMPTY) {
+                new_states[idx] = HASHTABLE_USED;
                 new_hash_cache[idx] = hash;
                 memcpy(
                     new_elements + idx * set->_element_size,
@@ -1194,19 +1193,19 @@ void hashset_add(HashSet* set, const void* element) {
     int location = -1;
 
     for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[idx] != USED && location == -1) {
+        if (set->_states[idx] != HASHTABLE_USED && location == -1) {
             location = idx;
-        } else if (set->_states[idx] == USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + set->_element_size * idx, element)) {
+        } else if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + set->_element_size * idx, element)) {
             return;
         }
-        if (set->_states[idx] == EMPTY)
+        if (set->_states[idx] == HASHTABLE_EMPTY)
             break;
         idx = (idx + step) & set->_mask;
     }
     
     memcpy(set->_elements + location * set->_element_size, element, set->_element_size);
     set->_hash_cache[location] = hash;
-    set->_states[location] = USED;
+    set->_states[location] = HASHTABLE_USED;
     set->_size++;
 }
 
@@ -1217,9 +1216,9 @@ bool hashset_has(const HashSet* set, const void* element) {
     uint64_t idx = hash & set->_mask;
 
     for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[idx] == EMPTY)
+        if (set->_states[idx] == HASHTABLE_EMPTY)
             return 0;
-        if (set->_states[idx] == USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
+        if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
             return 1;
         }
         idx = (idx + step) & set->_mask;
@@ -1234,10 +1233,10 @@ bool hashset_remove(HashSet* set, const void* element) {
     uint64_t idx = hash & set->_mask;
 
     for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[idx] == EMPTY)
+        if (set->_states[idx] == HASHTABLE_EMPTY)
             return 0;
-        if (set->_states[idx] == USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
-            set->_states[idx] = REMOVED;
+        if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
+            set->_states[idx] = HASHTABLE_REMOVED;
             set->_size--;
             return 1;
         }
@@ -1250,7 +1249,7 @@ HashSet hashset_copy(const HashSet* set) {
     HashSet copy = hashset_create(set->_element_size, set->_equals, set->_hash);
 
     for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[i] != USED)
+        if (set->_states[i] != HASHTABLE_USED)
             continue;
 
         hashset_add(&copy, set->_elements + i * set->_element_size);
@@ -1263,7 +1262,7 @@ HashSet hashset_union(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
     
     for (int i = 0; i < b->_capacity; i++){
-        if (b->_states[i] != USED)
+        if (b->_states[i] != HASHTABLE_USED)
             continue;
 
         hashset_add(&result, b->_elements + i * b->_element_size);
@@ -1287,7 +1286,7 @@ HashSet hashset_intersection(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_create(a->_element_size, a->_equals, a->_hash);
 
     for (int i = 0; i < smaller->_capacity; i++){
-        if (smaller->_states[i] != USED)
+        if (smaller->_states[i] != HASHTABLE_USED)
             continue;
 
         const void* element = smaller->_elements + i * smaller->_element_size;
@@ -1302,7 +1301,7 @@ HashSet hashset_difference(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
 
     for (int i = 0; i < b->_capacity; i++){
-        if (b->_states[i] != USED)
+        if (b->_states[i] != HASHTABLE_USED)
             continue;
 
         hashset_remove(&result, b->_elements + i * b->_element_size);
@@ -1313,7 +1312,7 @@ HashSet hashset_difference(const HashSet* a, const HashSet* b) {
 
 void hashset_foreach(const HashSet* set, void (*function)(const void*)) {
     for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[i] != USED)
+        if (set->_states[i] != HASHTABLE_USED)
             continue;
         function(set->_elements + i * set->_element_size);
     }
@@ -1373,7 +1372,7 @@ bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b) {
         return 0;
     
     for (int i = 0; i < a->_set._capacity; i++){
-        if (a->_set._states[i] != USED)
+        if (a->_set._states[i] != HASHTABLE_USED)
             continue;
         
         const void* element = a->_set._elements + i * a->_set._element_size;
@@ -1388,7 +1387,7 @@ uint64_t frozenhashset_hash(FrozenHashSet* f_set) {
         return f_set->_checksum;
 
     for (int i = 0; i < f_set->_set._capacity; i++){
-        if (f_set->_set._states[i] != USED)
+        if (f_set->_set._states[i] != HASHTABLE_USED)
             continue;
         
         uint64_t element_hash = hash_element_bytes(f_set->_set._elements + i * f_set->_set._element_size, f_set->_set._element_size);
@@ -1416,6 +1415,107 @@ FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashS
 
 void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const void*)) {
     hashset_foreach(&f_set->_set, function);
+}
+
+// ==========================================================
+// TRIE
+// ==========================================================
+
+static inline int trie_get_or_create_children(Trie* trie, int parent) {
+    if (trie->_nodes[parent]._children != -1)
+        return trie->_nodes[parent]._children;
+
+    if (trie->_used + ALPHABET_SIZE > trie->_capacity) {
+        trie->_capacity <<= 1;
+        trie->_nodes = realloc(trie->_nodes, trie->_capacity * sizeof(TrieNode));
+    }
+
+    for (int i = 0; i < ALPHABET_SIZE; i++){
+        trie->_nodes[trie->_used + i] = (TrieNode) {
+            ._parent = parent,
+            ._is_word = 0,
+            ._children = -1
+        };
+    }
+
+    int children = trie->_used;
+    trie->_nodes[parent]._children = children;
+    trie->_used += ALPHABET_SIZE;
+    return children;
+}
+
+Trie trie_create() {
+    Trie trie = {
+        ._capacity = START_TRIE_CAPACITY,
+        ._used = ALPHABET_SIZE,
+        ._size = 0,
+        ._nodes = malloc(sizeof(TrieNode) * START_TRIE_CAPACITY)
+    };
+    for (int i = 0; i < ALPHABET_SIZE; i++){
+        trie._nodes[i] = (TrieNode) {
+            ._parent = -1,
+            ._is_word = 0,
+            ._children = -1
+        };
+    }
+    
+    return trie;
+}
+
+void trie_free(Trie* trie) {
+    free(trie->_nodes);
+    trie->_nodes = NULL;
+}
+
+void trie_add_str(Trie* trie, const char* str) {
+    uint8_t c;
+    int node_idx = (uint8_t)(*(str++));
+    while((c = *(str++))) {
+        int children = trie_get_or_create_children(trie, node_idx);
+        node_idx = children + c;
+    }
+    if (trie->_nodes[node_idx]._is_word) 
+        return;
+    trie->_nodes[node_idx]._is_word = 1;
+    trie->_size++;
+}
+
+void trie_add_string(Trie* trie, const String* string) {
+    trie_add_str(trie, string->_memory);
+}
+
+int trie_length(const Trie* trie) {
+    return trie->_size;
+}
+
+bool trie_has_str(const Trie* trie, const char* str) {
+    uint8_t c;
+    int node_idx = (uint8_t)*(str++);
+    while((c = *(str++))) {
+        if (trie->_nodes[node_idx]._children == -1)
+            return 0;
+        node_idx = trie->_nodes[node_idx]._children + c;
+    }
+    return trie->_nodes[node_idx]._is_word;
+}
+
+bool trie_has_string(const Trie* trie, const String* string) {
+    return trie_has_str(trie, string->_memory);
+}
+
+bool trie_has_prefix_str(const Trie* trie, const char* str) {
+    uint8_t c;
+    int node_idx = (uint8_t)*(str++);
+    while((c = *(str++))) {
+        if (trie->_nodes[node_idx]._children == -1)
+            return 0;
+        node_idx = trie->_nodes[node_idx]._children + c;
+    }
+    return trie->_nodes[node_idx]._is_word || trie->_nodes[node_idx]._parent != -1;
+}
+
+bool trie_has_prefix_string(const Trie* trie, const String* string) {
+    return trie_has_prefix_str(trie, string->_memory);
 }
 
 // ==========================================================

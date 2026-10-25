@@ -294,6 +294,38 @@ FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashS
 void frozenhashset_foreach(const FrozenHashSet* set, void (*function)(const void*));
 
 // ==========================================================
+// TRIE
+// ==========================================================
+
+typedef struct TrieNode {
+    unsigned _is_word : 1;
+    int _parent;
+    int _children;
+} TrieNode;
+
+
+typedef struct Trie {
+    int _capacity;
+    int _used;
+    int _size;
+    TrieNode* _nodes; // root = 0
+} Trie;
+
+Trie trie_create();
+void trie_free(Trie* trie);
+
+void trie_add_str(Trie* trie, const char* str);
+void trie_add_string(Trie* trie, const String* string);
+
+int trie_length(const Trie* trie);
+
+bool trie_has_str(const Trie* trie, const char* str);
+bool trie_has_string(const Trie* trie, const String* string);
+
+bool trie_has_prefix_str(const Trie* trie, const char* str);
+bool trie_has_prefix_string(const Trie* trie, const String* string);
+
+// ==========================================================
 // OBJECT POOL
 // ==========================================================
 
