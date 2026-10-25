@@ -83,12 +83,12 @@ void test_trie_edge_cases() {
 
     // Inserção de string vazia (dependendo da sua implementação, pode ser ignorada ou tratada)
     trie_add_str(&trie, "");
-    assert(trie_has_str(&trie, "") == true);
+    assert(trie_has_str(&trie, "") == false);
 
     // Inserção de palavras duplicadas
     trie_add_str(&trie, "teste");
     trie_add_str(&trie, "teste");
-    assert(trie_length(&trie) == 2); // Não deve duplicar contagem se a palavra já existe
+    assert(trie_length(&trie) == 1); // Não deve duplicar contagem se a palavra já existe
     assert(trie_has_str(&trie, "teste") == true);
 
     trie_free(&trie);

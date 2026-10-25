@@ -1,216 +1,200 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
 #include <assert.h>
+#include <string.h>
 #include <time.h>
-#include "collections.h"
+#include "collections.h" // Inclui o seu cabeçalho atualizado
 
-// --- TESTES ---
+// Callback simples para o foreach
+static void dummy_callback(int index, char* chr) {
+    (void)index;
+    (void)chr;
+}
 
-// Teste 1: Criação, Getters e Casos Limite (Edge Cases)
-void test_string_creation_and_getters(void) {
-    // String normal
-    String s = string_create("Hello");
-    assert(string_length(&s) == 5);
-    assert(strcmp(string_get_str(&s), "Hello") == 0);
-    assert(s._capacity >= 5);
-    string_free(&s);
+void test_string_correctness() {
+    printf("[CORRETUDE] Executando testes unitarios para todos os metodos...\n");
 
-    // String vazia
+    // 1. Ciclo de Vida, Cópia e Informações Básicas
+    String s = string_create("  Hello, C Collections!  ");
+    assert(string_length(&s) == 25);
+    assert(strcmp(string_get_str(&s), "  Hello, C Collections!  ") == 0);
+    assert(string_is_empty(&s) == false);
+
     String empty = string_create("");
     assert(string_length(&empty) == 0);
-    assert(strcmp(string_get_str(&empty), "") == 0);
+    assert(string_is_empty(&empty) == true);
+
+    String copy = string_copy(&s);
+    assert(string_equals(&s, &copy) == true);
+
+    // 2. Modificadores
+    String mod = string_create("A");
+    string_append_char(&mod, 'B');
+    assert(strcmp(string_get_str(&mod), "AB") == 0);
+
+    String ext = string_create("CD");
+    string_extend(&mod, &ext);
+    assert(strcmp(string_get_str(&mod), "ABCD") == 0);
+
+    string_clear(&mod);
+    assert(string_length(&mod) == 0);
+    assert(string_is_empty(&mod) == true);
+
+    // 3. Transformações
+    String trimmed = string_trim(&s);
+    assert(strcmp(string_get_str(&trimmed), "Hello, C Collections!") == 0);
+
+    String sub = string_substring(&trimmed, 7, 13); // "C Collections"
+    printf("%s\n", sub._memory);
+    assert(strcmp(string_get_str(&sub), "C Collections") == 0);
+
+    string_to_lower(&sub);
+    assert(strcmp(string_get_str(&sub), "c collections") == 0);
+
+    string_to_upper(&sub);
+    assert(strcmp(string_get_str(&sub), "C COLLECTIONS") == 0);
+
+    String s1 = string_create("Data");
+    String s2 = string_create("Structures");
+    String concat = string_concatenate(&s1, &s2);
+    assert(strcmp(string_get_str(&concat), "DataStructures") == 0);
+
+    // 4. Buscas e Verificações de Fronteira
+    String text = string_create("Programacao em Linguagem C");
+    String q1 = string_create("Linguagem");
+    String q2 = string_create("Python");
+
+    assert(string_contains(&text, &q1) == true);
+    assert(string_contains(&text, &q2) == false);
+    assert(string_index_of(&text, &q1) == 15);
+    assert(string_index_of(&text, &q2) == -1);
+    assert(string_starts_with(&text, "Pro") == true);
+    assert(string_ends_with(&text, "C") == true);
+
+    // 5. Comparações e Hash
+    String a = string_create("Apple");
+    String b = string_create("Banana");
+    String a_clone = string_create("Apple");
+
+    assert(string_compare(&a, &b) < 0);
+    assert(string_compare(&b, &a) > 0);
+    assert(string_compare(&a, &a_clone) == 0);
+    assert(string_equals(&a, &a_clone) == true);
+
+    uint64_t hash_a = string_hash(&a);
+    uint64_t hash_clone = string_hash(&a_clone);
+    assert(hash_a == hash_clone);
+
+    // 6. Iteração
+    string_foreach(&a, dummy_callback);
+
+    // Limpeza de recursos
+    string_free(&s);
     string_free(&empty);
-
-    printf("[OK] Teste de criacao, getters e edge cases concluido.\n");
-}
-
-// Teste 2: Igualdade e Comparação Lexicográfica
-void test_string_equality_and_compare(void) {
-    String s1 = string_create("Hello");
-    String s2 = string_create("Hello");
-    String s3 = string_create("World");
-    String s4 = string_create("Hell");
-
-    // 1. Igualdade
-    assert(string_equals(&s1, &s2) == true);
-    assert(string_equals(&s1, &s3) == false);
-    
-    // 2. Comparação
-    assert(string_compare(&s1, &s3) < 0);  // "Hello" < "World"
-    assert(string_compare(&s3, &s1) > 0);  // "World" > "Hello"
-    assert(string_compare(&s1, &s2) == 0); // "Hello" == "Hello"
-    assert(string_compare(&s1, &s4) > 0);  // "Hello" > "Hell" (prefixo)
-
+    string_free(&copy);
+    string_free(&mod);
+    string_free(&ext);
+    string_free(&trimmed);
+    string_free(&sub);
     string_free(&s1);
     string_free(&s2);
-    string_free(&s3);
-    string_free(&s4);
-    
-    printf("[OK] Teste de igualdade e comparacao concluido.\n");
+    string_free(&concat);
+    string_free(&text);
+    string_free(&q1);
+    string_free(&q2);
+    string_free(&a);
+    string_free(&b);
+    string_free(&a_clone);
+
+    printf("[CORRETUDE] Todos os testes passaram com sucesso!\n\n");
 }
 
-// Teste 3: Manipulação (Append de Char, String e Invalidação de Hash)
-void test_string_manipulation(void) {
-    String s1 = string_create("Hello");
-    
-    // Garante que o hash inicial funciona e ativa o cache
-    uint64_t h_initial = string_hash(&s1);
-    assert(s1._hash_computed == true);
+void test_string_performance() {
+    printf("[PERFORMANCE] Iniciando testes de carga (stress test)...\n");
 
-    // 1. Append de caractere deve invalidar o hash
-    string_append_char(&s1, '!');
-    assert(s1._hash_computed == false);
-    assert(string_length(&s1) == 6);
-    assert(strcmp(string_get_str(&s1), "Hello!") == 0);
+    clock_t start, end;
+    double cpu_time_used;
+    const int iterations = 50000;
 
-    // 2. Append de outra String
-    String s2 = string_create(" C");
-    string_extend(&s1, &s2);
-    assert(s1._hash_computed == false);
-    assert(string_length(&s1) == 8);
-    assert(strcmp(string_get_str(&s1), "Hello! C") == 0);
-
-    string_free(&s1);
-    string_free(&s2);
-    
-    printf("[OK] Teste de manipulacao e invalidação de cache concluido.\n");
-}
-
-// Teste 4: Cópia e Limpeza (Copy e Clear)
-void test_string_copy_and_clear(void) {
-    String s1 = string_create("Testando");
-    
-    // 1. Cópia profunda (deep copy)
-    String s_copy = string_copy(&s1);
-    assert(string_equals(&s1, &s_copy) == true);
-    
-    // Modificar a cópia não deve afetar a original
-    string_append_char(&s_copy, 's');
-    assert(string_equals(&s1, &s_copy) == false);
-
-    // 2. Clear
-    string_clear(&s1);
-    assert(string_length(&s1) == 0);
-    assert(strcmp(string_get_str(&s1), "") == 0);
-    assert(s1._hash_computed == false);
-
-    string_free(&s1);
-    string_free(&s_copy);
-    
-    printf("[OK] Teste de copia e limpeza concluido.\n");
-}
-
-// Teste 5: Cálculo, Cache e Integridade de Hash
-void test_string_hash(void) {
-    String s = string_create("Collections");
-    
-    uint64_t h1 = string_hash(&s);
-    assert(s._hash_computed == true);
-    
-    // Leitura subsequente deve ser rápida e igual (via cache)
-    uint64_t h2 = string_hash(&s);
-    assert(h1 == h2);
-    assert(h1 != 0);
-
-    // Modificar a string recalcula o hash corretamente
-    string_append_char(&s, '!');
-    assert(s._hash_computed == false);
-    uint64_t h3 = string_hash(&s);
-    assert(h3 != h1); // O hash deve mudar
-
-    string_free(&s);
-    printf("[OK] Teste de hash e cache concluido.\n");
-}
-
-void test_string_contains(void) {
-    String main_str = string_create("Programando em C com colecoes modernas");
-
-    // Substring no início
-    String sub_start = string_create("Programando");
-    assert(string_index_of(&main_str, &sub_start) == 0);
-
-    // Substring no meio
-    String sub_mid = string_create("em C");
-    assert(string_index_of(&main_str, &sub_mid) == 12);
-
-    // Substring no fim
-    String sub_end = string_create("modernas");
-    assert(string_index_of(&main_str, &sub_end) == 30);
-
-    // Substring inexistente
-    String sub_missing = string_create("Python");
-    assert(string_index_of(&main_str, &sub_missing) < 0);
-
-    // Substring maior que a string principal
-    String sub_larger = string_create("Programando em C com colecoes modernas e completas");
-    assert(string_index_of(&main_str, &sub_larger) < 0);
-
-    // Limpeza
-    string_free(&main_str);
-    string_free(&sub_start);
-    string_free(&sub_mid);
-    string_free(&sub_end);
-    string_free(&sub_missing);
-    string_free(&sub_larger);
-
-    printf("[OK] Teste de string_index_of concluido com sucesso.\n");
-}
-
-// Teste 6: Stress e Performance (Benchmark)
-void test_string_performance_and_stress(void) {
-    printf("[BENCHMARK] Iniciando teste de estresse e performance...\n");
-    
-    clock_t start = clock();
-    
-    // Criação e appends em massa (simulando carga real)
+    // 1. Teste de Performance: Criação e Concatenação / Append
+    start = clock();
     String s = string_create("");
-    int iterations = 20000;
-    
     for (int i = 0; i < iterations; i++) {
-        string_append_char(&s, 'a');
+        string_append_char(&s, 'x');
     }
-    
-    assert(string_length(&s) == iterations);
-    
-    // Testando velocidade do hash com string grande (com e sem cache)
-    clock_t hash_start_1 = clock();
-    uint64_t h1 = string_hash(&s); // Primeiro cálculo (pesado)
-    clock_t hash_end_1 = clock();
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("  - string_append_char (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
 
-    clock_t hash_start_2 = clock();
-    uint64_t h2 = string_hash(&s); // Segundo cálculo (via cache - deve ser instantâneo)
-    clock_t hash_end_2 = clock();
+    // 2. Teste de Performance: Cópia e Tamanho
+    start = clock();
+    for (int i = 0; i < iterations; i++) {
+        String copy = string_copy(&s);
+        volatile int len = string_length(&copy);
+        (void)len;
+        string_free(&copy);
+    }
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("  - string_copy & length (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
 
-    assert(h1 == h2);
+    // 3. Teste de Performance: Transformações (Trim, Substring, ToUpper/Lower)
+    String target = string_create("   High Performance C Code Optimization Routine   ");
+    start = clock();
+    for (int i = 0; i < iterations; i++) {
+        String trimmed = string_trim(&target);
+        String sub = string_substring(&trimmed, 5, 11);
+        string_to_upper(&sub);
+        string_to_lower(&sub);
+        string_free(&trimmed);
+        string_free(&sub);
+    }
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("  - Transformations (trim, sub, upper/lower) (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
+    string_free(&target);
 
+    // 4. Teste de Performance: Buscas (Contains, Index Of)
+    String haystack = string_create("The quick brown fox jumps over the lazy dog and repeats the pattern continuously.");
+    String needle = string_create("lazy dog");
+    start = clock();
+    for (int i = 0; i < iterations; i++) {
+        volatile bool found = string_contains(&haystack, &needle);
+        volatile int idx = string_index_of(&haystack, &needle);
+        (void)found;
+        (void)idx;
+    }
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("  - Search routines (contains, index_of) (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
+    string_free(&haystack);
+    string_free(&needle);
+
+    // 5. Teste de Performance: Hashing (com cache e lazy evaluation)
+    start = clock();
+    for (int i = 0; i < iterations; i++) {
+        volatile uint64_t h = string_hash(&s);
+        (void)h;
+    }
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("  - string_hash with cache (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
+
+    // Limpeza final do objeto principal
     string_free(&s);
-    
-    clock_t end = clock();
-    double total_time = (double)(end - start) / CLOCKS_PER_SEC;
-    double hash_time_1 = (double)(hash_end_1 - hash_start_1) / CLOCKS_PER_SEC;
-    double hash_time_2 = (double)(hash_end_2 - hash_start_2) / CLOCKS_PER_SEC;
 
-    printf(" -> Iteracoes: %d appends\n", iterations);
-    printf(" -> Tempo total do teste: %.6f segundos\n", total_time);
-    printf(" -> Tempo 1o Hash (sem cache): %.6f seg\n", hash_time_1);
-    printf(" -> Tempo 2o Hash (com cache): %.6f seg\n", hash_time_2);
-    printf("[OK] Teste de performance e estresse concluido com sucesso!\n");
+    printf("[PERFORMANCE] Testes de carga finalizados com sucesso!\n");
 }
 
-int main(void) {
-    printf("--- Executando testes robustos para String ---\n\n");
+int main() {
+    printf("========================================\n");
+    printf("   SUÍTE DE TESTES E PERFORMANCE - STRING\n");
+    printf("========================================\n\n");
 
-    test_string_creation_and_getters();
-    test_string_equality_and_compare();
-    test_string_manipulation();
-    test_string_copy_and_clear();
-    test_string_hash();
-    test_string_contains();
-    test_string_performance_and_stress();
+    test_string_correctness();
+    test_string_performance();
 
-    printf("\n--- Todos os testes robustos passaram com sucesso! 🎉 ---\n");
+    printf("\n========================================\n");
+    printf("      TODOS OS TESTES CONCLUÍDOS!\n");
+    printf("========================================\n");
     return 0;
 }

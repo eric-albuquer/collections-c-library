@@ -3,12 +3,18 @@
 #include <string.h>
 
 #define START_CAPACITY 64
+
 #define START_TRIE_CAPACITY 1024
 #define ALPHABET_SIZE 256
+
 #define HASHMAP_FACTOR 0.75f
 #define HASHTABLE_EMPTY 0
 #define HASHTABLE_REMOVED 1
 #define HASHTABLE_USED 2
+
+#define BISTET_WORD 64
+#define BITSET_MASK 63
+#define BITSET_SHIFT 6
 
 // ==========================================================
 // EQUAL GENERIC FUNCTIONS
@@ -299,12 +305,93 @@ void string_clear(String* string) {
     string->_size = 1;
 }
 
-String string_copy(const String* string) {
-    String copy = string_create(string->_memory);
-    if (string->_hash_computed) {
-        copy._hash = string->_hash;
-        copy._hash_computed = 1;
+bool string_is_empty(const String* string) {
+    return string->_size <= 1;
+}
+
+String string_trim(const String* string) {
+    int left = 0;
+    int right = string->_size - 2;
+
+    while(string->_memory[left] == ' ')
+        left++;
+
+    while(string->_memory[right] == ' ')
+        right--;
+
+    int size = right - left + 1;
+    String result = {
+        ._capacity = size,
+        ._hash_computed = 0,
+        ._size = size,
+        ._memory = malloc(size)
+    };
+
+    memcpy(result._memory, string->_memory + left, size);
+    result._memory[size] = 0;
+    return result;
+}
+
+String string_substring(const String* string, int start, int length) {
+    String result = {
+        ._capacity = length + 1,
+        ._hash_computed = 0,
+        ._size = length + 1,
+        ._memory = malloc(length + 1)
+    };
+
+    memcpy(result._memory, string->_memory + start, length);
+    result._memory[length] = 0;
+    return result;
+}
+
+void string_to_lower(String* string) {
+    static const int lower_offset = 'a' - 'A';
+    for (int i = 0; i < string->_size - 1; i++){
+        if (string->_memory[i] >= 'A' && string->_memory[i] <= 'Z')
+            string->_memory[i] += lower_offset;
     }
+}
+
+void string_to_upper(String* string) {
+    static const int upper_offset = 'A' - 'a';
+    for (int i = 0; i < string->_size - 1; i++){
+        if (string->_memory[i] >= 'a' && string->_memory[i] <= 'z')
+            string->_memory[i] += upper_offset;
+    }
+}
+
+bool string_starts_with(const String* string, const char* prefix) {
+    char c;
+    int idx = 0;
+    while ((c = *(prefix++))){
+        if (string->_memory[idx] != c)
+            return 0;
+        idx++;
+    }
+    return 1;
+}
+
+bool string_ends_with(const String* string, const char* suffix) {
+    int length = strlen(suffix);
+    int idx = string->_size - 2;
+    for (int i = length - 1; i >= 0; i--){
+        if (string->_memory[idx] != suffix[i])
+            return 0;
+        idx--;
+    }
+    return 1;
+}
+
+String string_copy(const String* string) {
+    String copy = {
+        ._capacity = string->_capacity,
+        ._hash_computed = string->_hash_computed,
+        ._hash = string->_hash,
+        ._size = string->_size,
+        ._memory = malloc(string->_capacity)
+    };
+    memcpy(copy._memory, string->_memory, string->_size);
         
     return copy;
 }
@@ -1470,6 +1557,8 @@ void trie_free(Trie* trie) {
 void trie_add_str(Trie* trie, const char* str) {
     uint8_t c;
     int node_idx = (uint8_t)(*(str++));
+    if (node_idx == 0)
+        return;
     while((c = *(str++))) {
         int children = trie_get_or_create_children(trie, node_idx);
         node_idx = children + c;
@@ -1523,7 +1612,7 @@ bool trie_has_prefix_string(const Trie* trie, const String* string) {
 // ==========================================================
 
 ObjectPool objpool_create(int max_capacity, int obj_size) {
-    obj_size = int_max(obj_size, sizeof(uint64_t));
+    obj_size = (obj_size + 7) & ~7;
     ObjectPool pool = {
         ._capacity = max_capacity,
         ._obj_size = obj_size,
@@ -1654,8 +1743,120 @@ bool bytearray_seek(ByteArray* bytearray, int offset) {
     if ((unsigned int)offset >= bytearray->_capacity)
         return 0;
     bytearray->_cursor = offset;
+    return 1;
 }
 
 int bytearray_available(const ByteArray* bytearray) {
     return bytearray->_size - bytearray->_cursor;
+}
+
+// ==========================================================
+// BIT SET
+// ==========================================================
+
+typedef struct BitSet {
+    int _size;
+    uint64_t* _data;
+} BitSet;
+
+BitSet bitset_create(int size) {
+    size = (size + BITSET_MASK) & ~BITSET_MASK;
+    BitSet bitset = {
+        ._size = size,
+        ._data = calloc(size, 1)
+    };
+
+    return bitset;
+}
+
+void bitset_free(BitSet* bitset) {
+    free(bitset->_data);
+    bitset->_data = NULL;
+}
+
+BitSet bitset_copy(const BitSet* bitset) {
+    BitSet copy = {
+        ._size = bitset->_size,
+        ._data = malloc(bitset->_size)
+    };
+
+    memcpy(copy._data, bitset->_data, bitset->_size);
+    return copy;
+}
+
+void bitset_clear(BitSet* bitset) {
+    memset(bitset->_data, 0, bitset->_size);
+}
+
+void bitset_fill(BitSet* bitset, bool value) {
+    memset(bitset->_data, 0xff * value, bitset->_size);
+}
+
+void bitset_set(BitSet* bitset, int bit) {
+    const int idx = bit >> BITSET_SHIFT;
+    bitset->_data[idx] |= (1ULL << (bit & BITSET_MASK));
+}
+
+bool bitset_get(const BitSet* bitset, int bit) {
+    const int idx = bit >> BITSET_SHIFT;
+    return (bitset->_data[idx] & (1ULL << (bit & BITSET_MASK))) != 0;
+}
+
+void bitset_flip(BitSet* bitset, int bit) {
+    const int idx = bit >> BITSET_SHIFT;
+    bitset->_data[idx] ^= (1ULL << (bit & BITSET_MASK));
+}
+
+BitSet bitset_and(const BitSet* a, const BitSet* b) {
+    BitSet result = bitset_copy(a);
+    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+        result._data[i] &= b->_data[i];
+    return result;
+}
+
+BitSet bitset_or(const BitSet* a, const BitSet* b) {
+    BitSet result = bitset_copy(a);
+    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+        result._data[i] |= b->_data[i];
+    return result;
+}
+
+BitSet bitset_xor(const BitSet* a, const BitSet* b) {
+    BitSet result = bitset_copy(a);
+    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+        result._data[i] ^= b->_data[i];
+    return result;
+}
+
+BitSet bitset_not(const BitSet* a) {
+    BitSet result = {
+        ._size = a->_size,
+        ._data = malloc(a->_size)
+    };
+
+    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+        result._data[i] = ~a->_data[i];
+
+    return result;
+}
+
+bool bitset_any(const BitSet* bitset) {
+    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
+        if (bitset->_data[i]) return 1;
+    
+    return 0;
+}
+
+bool bitset_all(const BitSet* bitset) {
+    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
+        if (bitset->_data[i] != 0xffffffffffffffffULL) return 0;
+
+    return 1;
+}
+
+bool bitset_none(const BitSet* bitset) {
+    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
+        if (bitset->_data[i] != 0) return 0;
+
+    return 1;
 }

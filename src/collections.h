@@ -1,8 +1,8 @@
 #ifndef COLLECTIONS_H
 #define COLLECTIONS_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 // ==========================================================
 // EQUAL GENERIC FUNCTIONS
@@ -67,24 +67,28 @@ typedef struct String {
 
 String string_create(const char* str);
 void string_free(String* string);
+String string_copy(const String* string);
 
 const char* string_get_str(const String* string);
 int string_length(const String* string);
+bool string_is_empty(const String* string);
 
 void string_append_char(String* string, const char chr);
+void string_extend(String* a, const String* b);
 void string_clear(String* string);
 
-String string_copy(const String* string);
+String string_trim(const String* string);
+String string_substring(const String* string, int start, int length);
+String string_concatenate(const String* a, const String* b);
+void string_to_lower(String* string);
+void string_to_upper(String* string);
+
+int string_index_of(const String* a, const String* b);
+bool string_contains(const String* a, const String* b);
+bool string_starts_with(const String* string, const char* prefix);
+bool string_ends_with(const String* string, const char* suffix);
 
 int string_compare(const String* a, const String* b);
-
-void string_extend(String* a, const String* b);
-
-String string_concatenate(const String* a, const String* b);
-
-int string_index_of(const String* a, const String* b); 
-bool string_contains(const String* a, const String* b); 
-
 bool string_equals(const String* a, const String* b);
 uint64_t string_hash(String* string);
 
@@ -124,9 +128,10 @@ bool arraylist_swap(ArrayList* list, int i, int j);
 void arraylist_shuffle(ArrayList* list);
 
 ArrayList arraylist_copy(const ArrayList* list);
-void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*));
-int arraylist_bsearch(const ArrayList* list, const void* element, int(*cmp)(const void*, const void*));
-void arraylist_foreach(ArrayList* list, void(*function)(int, void*));
+void arraylist_sort(ArrayList* list, int (*cmp)(const void*, const void*));
+int arraylist_bsearch(const ArrayList* list, const void* element,
+                      int (*cmp)(const void*, const void*));
+void arraylist_foreach(ArrayList* list, void (*function)(int, void*));
 
 // ==========================================================
 // ARRAY DEQUE
@@ -157,7 +162,7 @@ bool arraydeque_popleft(ArrayDeque* deque, void* out);
 
 ArrayDeque arraydeque_copy(const ArrayDeque* deque);
 
-void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, void*));
+void arraydeque_foreach(ArrayDeque* deque, void (*function)(int, void*));
 
 // ==========================================================
 // HEAP
@@ -183,7 +188,7 @@ bool heap_pop(Heap* heap, void* out);
 
 Heap heap_copy(const Heap* heap);
 
-void heap_foreach(const Heap* heap, void(*function)(int, const void*));
+void heap_foreach(const Heap* heap, void (*function)(int, const void*));
 
 // ==========================================================
 // HASH MAP
@@ -195,7 +200,7 @@ typedef struct HashMap {
     int _max_elements;
 
     bool (*_equals)(const void*, const void*);
-    uint64_t (*_hash)(const void*); 
+    uint64_t (*_hash)(const void*);
 
     int _key_size;
     int _value_size;
@@ -207,17 +212,15 @@ typedef struct HashMap {
     uint8_t* _values;
 } HashMap;
 
-HashMap hashmap_create(
-    int key_size,
-    int value_size,
-    bool (*equals)(const void*, const void*),
-    uint64_t (*hash)(const void*)
-);
+HashMap hashmap_create(int key_size, int value_size,
+                       bool (*equals)(const void*, const void*),
+                       uint64_t (*hash)(const void*));
 void hashmap_free(HashMap* map);
 
 int hashmap_length(const HashMap* map);
 
-void hashmap_set(HashMap* map, const void* key, const void* value, void* old_value);
+void hashmap_set(HashMap* map, const void* key, const void* value,
+                 void* old_value);
 bool hashmap_get(const HashMap* map, const void* key, void* out);
 bool hashmap_remove(HashMap* map, const void* key, void* out);
 
@@ -237,7 +240,7 @@ typedef struct HashSet {
     int _max_elements;
 
     bool (*_equals)(const void*, const void*);
-    uint64_t (*_hash)(const void*); 
+    uint64_t (*_hash)(const void*);
 
     int _element_size;
     int _size;
@@ -247,11 +250,9 @@ typedef struct HashSet {
     uint8_t* _elements;
 } HashSet;
 
-HashSet hashset_create(
-    int element_size,
-    bool (*equals)(const void*, const void*),
-    uint64_t (*hash)(const void*)
-);
+HashSet hashset_create(int element_size,
+                       bool (*equals)(const void*, const void*),
+                       uint64_t (*hash)(const void*));
 void hashset_free(HashSet* set);
 
 int hashset_length(const HashSet* set);
@@ -287,11 +288,15 @@ bool frozenhashset_has(const FrozenHashSet* set, const void* element);
 bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b);
 uint64_t frozenhashset_hash(FrozenHashSet* f_set);
 
-FrozenHashSet frozenhashset_union(const FrozenHashSet* a, const FrozenHashSet* b);
-FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a, const FrozenHashSet* b);
-FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashSet* b);
+FrozenHashSet frozenhashset_union(const FrozenHashSet* a,
+                                  const FrozenHashSet* b);
+FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a,
+                                         const FrozenHashSet* b);
+FrozenHashSet frozenhashset_difference(const FrozenHashSet* a,
+                                       const FrozenHashSet* b);
 
-void frozenhashset_foreach(const FrozenHashSet* set, void (*function)(const void*));
+void frozenhashset_foreach(const FrozenHashSet* set,
+                           void (*function)(const void*));
 
 // ==========================================================
 // TRIE
@@ -303,12 +308,11 @@ typedef struct TrieNode {
     int _children;
 } TrieNode;
 
-
 typedef struct Trie {
     int _capacity;
     int _used;
     int _size;
-    TrieNode* _nodes; // root = 0
+    TrieNode* _nodes;  // root = 0
 } Trie;
 
 Trie trie_create();
@@ -384,5 +388,35 @@ int bytearray_read_bytes(ByteArray* bytearray, void* out, int size);
 
 bool bytearray_seek(ByteArray* bytearray, int offset);
 int bytearray_available(const ByteArray* bytearray);
+
+// ==========================================================
+// BIT SET
+// ==========================================================
+
+typedef struct BitSet {
+    int _size;
+    uint64_t* _data;
+} BitSet;
+
+BitSet bitset_create(int size);
+void bitset_free(BitSet* bitset);
+
+BitSet bitset_copy(const BitSet* bitset);
+
+void bitset_clear(BitSet* bitset);
+void bitset_fill(BitSet* bitset, bool value);
+
+void bitset_set(BitSet* bitset, int bit);
+bool bitset_get(const BitSet* bitset, int bit);
+void bitset_flip(BitSet* bitset, int bit);
+
+BitSet bitset_and(const BitSet* a, const BitSet* b);
+BitSet bitset_or(const BitSet* a, const BitSet* b);
+BitSet bitset_xor(const BitSet* a, const BitSet* b);
+BitSet bitset_not(const BitSet* a);
+
+bool bitset_any(const BitSet* bitset);
+bool bitset_all(const BitSet* bitset);
+bool bitset_none(const BitSet* bitset);
 
 #endif
