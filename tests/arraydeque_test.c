@@ -2,12 +2,22 @@
 #include <assert.h>
 #include "collections.h"
 
-// Teste 1: Fluxo Básico de Inserção e Remoção (FIFO e LIFO)
+static int foreach_sum;
+static int foreach_count;
+static bool foreach_indices_valid;
+
+static void accumulate_deque_element(int index, void* element) {
+    if (index != foreach_count) {
+        foreach_indices_valid = false;
+    }
+    foreach_sum += *(int*)element;
+    foreach_count++;
+}
+
 void test_arraydeque_basic(void) {
     ArrayDeque deque = arraydeque_create(sizeof(int));
     assert(deque._size == 0);
 
-    // Testando append (no final) e popleft (frente) -> Comportamento de Fila (FIFO)
     int val1 = 10, val2 = 20, val3 = 30;
     arraydeque_append(&deque, &val1);
     arraydeque_append(&deque, &val2);
@@ -27,21 +37,17 @@ void test_arraydeque_basic(void) {
 
     assert(deque._size == 0);
 
-    // Testando underflow (pop em deque vazia)
     assert(arraydeque_popleft(&deque, &out) == 0);
     assert(arraydeque_pop(&deque, &out) == 0);
 
     arraydeque_free(&deque);
-    printf("[OK] Teste basico concluido.\n");
 }
 
-// Teste 2: Inserção à esquerda (appendleft) e remoção à direita (pop)
 void test_arraydeque_stack_and_deque_ops(void) {
     ArrayDeque deque = arraydeque_create(sizeof(int));
 
     int v1 = 100, v2 = 200, v3 = 300;
-    
-    // Inserindo na esquerda: ordem final esperada na fila -> [300, 200, 100]
+
     arraydeque_appendleft(&deque, &v1);
     arraydeque_appendleft(&deque, &v2);
     arraydeque_appendleft(&deque, &v3);
@@ -49,33 +55,27 @@ void test_arraydeque_stack_and_deque_ops(void) {
     assert(deque._size == 3);
 
     int out;
-    // Pop remove do final (direita) -> deve sair v1 (100) primeiro
     assert(arraydeque_pop(&deque, &out) == 1);
     assert(out == 100);
 
-    // Popleft remove da frente (esquerda) -> deve sair v3 (300)
     assert(arraydeque_popleft(&deque, &out) == 1);
     assert(out == 300);
 
     assert(deque._size == 1);
 
     arraydeque_free(&deque);
-    printf("[OK] Teste de operacoes combinadas (appendleft/pop) concluido.\n");
 }
 
-// Teste 3: Carga e Redimensionamento Dinâmico (Resize / Wraparound)
 void test_arraydeque_stress_and_resize(void) {
     ArrayDeque deque = arraydeque_create(sizeof(int));
     int total_elements = 1000;
 
-    // Inserindo uma grande quantidade de elementos para forçar resize do buffer
     for (int i = 0; i < total_elements; i++) {
         arraydeque_append(&deque, &i);
     }
 
     assert(deque._size == total_elements);
 
-    // Verificando a integridade dos dados na remoção
     for (int i = 0; i < total_elements; i++) {
         int out = -1;
         int status = arraydeque_popleft(&deque, &out);
@@ -86,25 +86,23 @@ void test_arraydeque_stress_and_resize(void) {
     assert(deque._size == 0);
 
     arraydeque_free(&deque);
-    printf("[OK] Teste de carga e redimensionamento concluido.\n");
 }
 
-// Teste 4: Verificação de Tipos Diferentes (Genéricos com void*)
 void test_arraydeque_generic_types(void) {
     typedef struct {
         int x;
         int y;
-    } Ponto;
+    } Point;
 
-    ArrayDeque deque = arraydeque_create(sizeof(Ponto));
+    ArrayDeque deque = arraydeque_create(sizeof(Point));
 
-    Ponto p1 = {10, 20};
-    Ponto p2 = {30, 40};
+    Point p1 = {10, 20};
+    Point p2 = {30, 40};
 
     arraydeque_append(&deque, &p1);
     arraydeque_append(&deque, &p2);
 
-    Ponto out;
+    Point out;
     assert(arraydeque_popleft(&deque, &out) == 1);
     assert(out.x == 10 && out.y == 20);
 
@@ -112,17 +110,78 @@ void test_arraydeque_generic_types(void) {
     assert(out.x == 30 && out.y == 40);
 
     arraydeque_free(&deque);
-    printf("[OK] Teste com tipos genericos (structs) concluido.\n");
+}
+
+void test_arraydeque_copy_and_foreach(void) {
+    ArrayDeque deque = arraydeque_create(sizeof(int));
+    int out = -1;
+
+    for (int value = 0; value < 64; value++) {
+        arraydeque_append(&deque, &value);
+    }
+    for (int expected = 0; expected < 32; expected++) {
+        assert(arraydeque_popleft(&deque, &out));
+        assert(out == expected);
+    }
+    for (int value = 64; value < 96; value++) {
+        arraydeque_append(&deque, &value);
+    }
+
+    ArrayDeque copy = arraydeque_copy(&deque);
+    assert(arraydeque_length(&copy) == 64);
+
+    foreach_sum = 0;
+    foreach_count = 0;
+    foreach_indices_valid = true;
+    arraydeque_foreach(&copy, accumulate_deque_element);
+    assert(foreach_count == 64);
+    assert(foreach_sum == 4064);
+    assert(foreach_indices_valid);
+
+    assert(arraydeque_popleft(&copy, &out));
+    assert(out == 32);
+    assert(arraydeque_length(&deque) == 64);
+    assert(arraydeque_length(&copy) == 63);
+
+    arraydeque_free(&deque);
+    arraydeque_free(&copy);
+}
+
+void test_arraydeque_wraparound_resize(void) {
+    ArrayDeque deque = arraydeque_create(sizeof(int));
+    int out = -1;
+
+    for (int value = 0; value < 64; value++) {
+        arraydeque_append(&deque, &value);
+    }
+    for (int expected = 0; expected < 32; expected++) {
+        assert(arraydeque_popleft(&deque, &out));
+        assert(out == expected);
+    }
+    for (int value = 64; value < 128; value++) {
+        arraydeque_append(&deque, &value);
+    }
+
+    assert(arraydeque_length(&deque) == 96);
+    for (int expected = 32; expected < 128; expected++) {
+        assert(arraydeque_popleft(&deque, &out));
+        assert(out == expected);
+    }
+    assert(arraydeque_length(&deque) == 0);
+    assert(!arraydeque_pop(&deque, &out));
+
+    arraydeque_free(&deque);
 }
 
 int main(void) {
-    printf("--- Executando testes para ArrayDeque ---\n");
-    
+
     test_arraydeque_basic();
     test_arraydeque_stack_and_deque_ops();
     test_arraydeque_stress_and_resize();
     test_arraydeque_generic_types();
+    test_arraydeque_copy_and_foreach();
+    test_arraydeque_wraparound_resize();
 
-    printf("--- Todos os testes passaram com sucesso! ---\n");
+    puts("All tests passed.");
     return 0;
 }

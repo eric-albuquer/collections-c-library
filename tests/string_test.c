@@ -2,18 +2,21 @@
 #include <assert.h>
 #include <string.h>
 #include <time.h>
-#include "collections.h" // Inclui o seu cabeçalho atualizado
+#include "collections.h"
 
-// Callback simples para o foreach
+static int foreach_count;
+static bool foreach_matches_text;
+
 static void dummy_callback(int index, char* chr) {
-    (void)index;
-    (void)chr;
+    static const char expected[] = "Apple";
+    if (index != foreach_count || *chr != expected[foreach_count]) {
+        foreach_matches_text = false;
+    }
+    foreach_count++;
 }
 
 void test_string_correctness() {
-    printf("[CORRETUDE] Executando testes unitarios para todos os metodos...\n");
 
-    // 1. Ciclo de Vida, Cópia e Informações Básicas
     String s = string_create("  Hello, C Collections!  ");
     assert(string_length(&s) == 25);
     assert(strcmp(string_get_str(&s), "  Hello, C Collections!  ") == 0);
@@ -26,7 +29,6 @@ void test_string_correctness() {
     String copy = string_copy(&s);
     assert(string_equals(&s, &copy) == true);
 
-    // 2. Modificadores
     String mod = string_create("A");
     string_append_char(&mod, 'B');
     assert(strcmp(string_get_str(&mod), "AB") == 0);
@@ -39,12 +41,10 @@ void test_string_correctness() {
     assert(string_length(&mod) == 0);
     assert(string_is_empty(&mod) == true);
 
-    // 3. Transformações
     String trimmed = string_trim(&s);
     assert(strcmp(string_get_str(&trimmed), "Hello, C Collections!") == 0);
 
-    String sub = string_substring(&trimmed, 7, 13); // "C Collections"
-    printf("%s\n", sub._memory);
+    String sub = string_substring(&trimmed, 7, 13);
     assert(strcmp(string_get_str(&sub), "C Collections") == 0);
 
     string_to_lower(&sub);
@@ -58,19 +58,17 @@ void test_string_correctness() {
     String concat = string_concatenate(&s1, &s2);
     assert(strcmp(string_get_str(&concat), "DataStructures") == 0);
 
-    // 4. Buscas e Verificações de Fronteira
-    String text = string_create("Programacao em Linguagem C");
-    String q1 = string_create("Linguagem");
+    String text = string_create("Programming in C Language");
+    String q1 = string_create("Language");
     String q2 = string_create("Python");
 
     assert(string_contains(&text, &q1) == true);
     assert(string_contains(&text, &q2) == false);
-    assert(string_index_of(&text, &q1) == 15);
+    assert(string_index_of(&text, &q1) == 17);
     assert(string_index_of(&text, &q2) == -1);
     assert(string_starts_with(&text, "Pro") == true);
-    assert(string_ends_with(&text, "C") == true);
+    assert(string_ends_with(&text, "Language") == true);
 
-    // 5. Comparações e Hash
     String a = string_create("Apple");
     String b = string_create("Banana");
     String a_clone = string_create("Apple");
@@ -84,10 +82,12 @@ void test_string_correctness() {
     uint64_t hash_clone = string_hash(&a_clone);
     assert(hash_a == hash_clone);
 
-    // 6. Iteração
+    foreach_count = 0;
+    foreach_matches_text = true;
     string_foreach(&a, dummy_callback);
+    assert(foreach_count == string_length(&a));
+    assert(foreach_matches_text);
 
-    // Limpeza de recursos
     string_free(&s);
     string_free(&empty);
     string_free(&copy);
@@ -105,17 +105,14 @@ void test_string_correctness() {
     string_free(&b);
     string_free(&a_clone);
 
-    printf("[CORRETUDE] Todos os testes passaram com sucesso!\n\n");
 }
 
 void test_string_performance() {
-    printf("[PERFORMANCE] Iniciando testes de carga (stress test)...\n");
 
     clock_t start, end;
     double cpu_time_used;
     const int iterations = 50000;
 
-    // 1. Teste de Performance: Criação e Concatenação / Append
     start = clock();
     String s = string_create("");
     for (int i = 0; i < iterations; i++) {
@@ -123,9 +120,7 @@ void test_string_performance() {
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("  - string_append_char (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
 
-    // 2. Teste de Performance: Cópia e Tamanho
     start = clock();
     for (int i = 0; i < iterations; i++) {
         String copy = string_copy(&s);
@@ -135,9 +130,7 @@ void test_string_performance() {
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("  - string_copy & length (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
 
-    // 3. Teste de Performance: Transformações (Trim, Substring, ToUpper/Lower)
     String target = string_create("   High Performance C Code Optimization Routine   ");
     start = clock();
     for (int i = 0; i < iterations; i++) {
@@ -150,10 +143,8 @@ void test_string_performance() {
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("  - Transformations (trim, sub, upper/lower) (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
     string_free(&target);
 
-    // 4. Teste de Performance: Buscas (Contains, Index Of)
     String haystack = string_create("The quick brown fox jumps over the lazy dog and repeats the pattern continuously.");
     String needle = string_create("lazy dog");
     start = clock();
@@ -165,11 +156,9 @@ void test_string_performance() {
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("  - Search routines (contains, index_of) (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
     string_free(&haystack);
     string_free(&needle);
 
-    // 5. Teste de Performance: Hashing (com cache e lazy evaluation)
     start = clock();
     for (int i = 0; i < iterations; i++) {
         volatile uint64_t h = string_hash(&s);
@@ -177,24 +166,18 @@ void test_string_performance() {
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("  - string_hash with cache (%d iteracoes): %.4f segundos\n", iterations, cpu_time_used);
 
-    // Limpeza final do objeto principal
     string_free(&s);
+    printf("String benchmark: %d iterations per workload; final workload took %.6f seconds.\n",
+           iterations, cpu_time_used);
 
-    printf("[PERFORMANCE] Testes de carga finalizados com sucesso!\n");
 }
 
 int main() {
-    printf("========================================\n");
-    printf("   SUÍTE DE TESTES E PERFORMANCE - STRING\n");
-    printf("========================================\n\n");
 
     test_string_correctness();
     test_string_performance();
 
-    printf("\n========================================\n");
-    printf("      TODOS OS TESTES CONCLUÍDOS!\n");
-    printf("========================================\n");
+    puts("All tests passed.");
     return 0;
 }

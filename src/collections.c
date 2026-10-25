@@ -646,6 +646,9 @@ static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, int
 
 void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
     int n = list->_size;
+    if (n < 2)
+        return;
+
     int min_run = calc_min_run(n);
 
     for (int i = 0; i < n; i += min_run){
@@ -665,10 +668,10 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
         list->_memory = aux;
         aux = temp;
         for (int i = 0; i < n; i += double_size){
-            int mid = int_min(i + size - 1, n - 1);
-            int end = int_min(i + double_size - 1, n - 1);
+            int mid = int_min(i + size, n);
+            int end = int_min(i + double_size, n);
 
-            if (mid < end)
+            if (i < end)
                 merge(list, aux, i, mid, end, cmp);
         }
         size = double_size;
@@ -820,6 +823,7 @@ ArrayDeque arraydeque_copy(const ArrayDeque* deque) {
     ArrayDeque copy = {
         ._capacity = deque->_capacity,
         ._element_size = deque->_element_size,
+        ._size = deque->_size,
         ._head = deque->_head,
         ._tail = deque->_tail,
         ._mask = deque->_mask,
@@ -1753,11 +1757,6 @@ int bytearray_available(const ByteArray* bytearray) {
 // ==========================================================
 // BIT SET
 // ==========================================================
-
-typedef struct BitSet {
-    int _size;
-    uint64_t* _data;
-} BitSet;
 
 BitSet bitset_create(int size) {
     size = (size + BITSET_MASK) & ~BITSET_MASK;

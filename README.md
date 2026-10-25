@@ -1,24 +1,26 @@
 # Collections C Library
 
-A lightweight, generic, and high-performance collection library written in ANSI/C11 C. It provides dynamic arrays, double-ended queues, priority heaps, hash maps, and hash sets with automatic memory reallocation and byte-level generic storage using `void*`.
+A generic collection and memory-utility library written in C99/C11. Elements are stored as raw bytes, so each collection is configured with the size of its element type. Hash-based collections also receive caller-provided equality and hash callbacks; ordered collections receive a comparator where required.
 
----
+The library has no third-party dependencies and uses only the C standard library.
 
 ## Features
 
-- **Generic Types**: Stores data of any size using byte-level copying (`sizeof(T)`).
-- **Dynamic Memory**: Automated capacity management and resizing.
-- **Pure C**: Compatible with C99/C11 standards with zero external dependencies (standard C runtime only).
-- **Comprehensive Data Structures**:
-  - `ArrayList`: Dynamic array with sorting and mapping utilities.
-  - `ArrayDeque`: Double-ended ring buffer (FIFO/LIFO queue).
-  - `Heap`: Generic Priority Queue driven by custom comparison callbacks.
-  - `HashMap`: Open-addressing hash table with cached hashes and tombstone states.
-  - `HashSet`: Fast unique-value container backed by open addressing.
+- **String**: owned, growable strings with copying, concatenation, trimming, substring, case conversion, searching, comparison, hashing, and character iteration.
+- **ArrayList**: resizable indexed storage with append/pop, positional get/set/insert/remove, swapping, shuffling, copying, sorting, binary search, and iteration.
+- **ArrayDeque**: resizable circular double-ended queue with append/pop operations on both ends, copying, and iteration.
+- **Heap**: generic binary priority queue with caller-defined ordering, copying, and iteration.
+- **HashMap**: open-addressed key/value storage with updates, lookup, removal, copying, and key/value/item callbacks.
+- **HashSet**: open-addressed unique-value storage with copying, iteration, and union/intersection/difference operations.
+- **FrozenHashSet**: copied set storage with cached hash, equality, membership, set operations, and iteration.
+- **Trie**: string storage with duplicate-aware length, complete-word lookup, and prefix lookup; accepts C strings and the library's `String`.
+- **ObjectPool**: fixed-capacity allocation and slot reuse for same-sized objects.
+- **ArenaPool**: bounded byte allocations released together.
+- **ByteArray**: growable byte storage with reserve, cursor-based reads/writes, seeking, and available-byte reporting.
+- **BitSet**: bit access, setting, flipping, fill/clear, copying, logical operations, and aggregate state queries.
+- **Generic helpers**: built-in equality, hashing, comparison, and integer/number min/max helpers.
 
----
-
-## Project Structure
+## Project layout
 
 ```text
 .
@@ -26,246 +28,110 @@ A lightweight, generic, and high-performance collection library written in ANSI/
 │   ├── collections.c
 │   └── collections.h
 └── tests/
-    ├── arraylist_test.c
+    ├── arenapool_test.c
     ├── arraydeque_test.c
-    ├── heap_test.c
+    ├── arraylist_test.c
+    ├── bitset_test.c
+    ├── bytearray_test.c
+    ├── frozenhashset_test.c
     ├── hashmap_test.c
-    └── hashset_test.c
+    ├── hashset_test.c
+    ├── heap_test.c
+    ├── objpool_test.c
+    ├── string_test.c
+    └── trie_test.c
 ```
 
----
+## Build and run
 
-## Building & Testing
+Each test file is a separate executable with its own `main` function. Compile an individual suite with GCC or Clang:
 
-### Compiling Tests with `gcc` / `clang`
-
-To compile and run an individual test file:
-
-```bash
-# Example: Compiling the HashMap test
-gcc -Isrc tests/hashmap_test.c src/collections.c -o run_tests && ./run_tests
+```sh
+gcc -std=c11 -Isrc tests/arraylist_test.c src/collections.c -o run_tests
+./run_tests
 ```
 
-To run all test suites in a single loop:
+### Run every suite on macOS or Linux
 
-MACOS / LINUX
-```bash
-for file in ./tests/*.c; do gcc -Isrc "$file" ./src/collections.c -o test_bin && ./test_bin || break; done
+```sh
+executable="$(mktemp)"
+trap 'rm -f "$executable"' EXIT
+for source in tests/*.c; do
+    gcc -std=c11 -Isrc "$source" src/collections.c -o "$executable" || exit 1
+    "$executable" || exit 1
+done
 ```
 
-WINDOWS
-```bash
-FOR %f IN (.\tests\*.c) DO gcc -Isrc "%f" .\src\collections.c -o test_bin.exe && test_bin.exe
+### Run every suite in Windows PowerShell
+
+```powershell
+$failed = $false
+Get-ChildItem .\tests\*.c | ForEach-Object {
+    $executable = Join-Path $env:TEMP ($_.BaseName + ".exe")
+    gcc -std=c11 -Isrc $_.FullName .\src\collections.c -o $executable
+    if ($LASTEXITCODE -ne 0) {
+        $failed = $true
+    } else {
+        & $executable
+        if ($LASTEXITCODE -ne 0) {
+            $failed = $true
+        }
+    }
+    Remove-Item $executable -ErrorAction SilentlyContinue
+}
+if ($failed) { exit 1 }
 ```
 
----
+The test programs use `assert`; compile them without defining `NDEBUG` so their checks remain active.
 
-## API & Usage Examples
+## Test coverage
 
-### 1. ArrayList
+All test sources and console messages are in English. Each suite checks normal operations, boundary conditions, and cleanup for its corresponding API:
 
-A dynamic array that expands automatically.
+| Test suite | Main coverage |
+|---|---|
+| `string_test.c` | Creation, empty strings, copy/equality/hash, append/extend/clear, trim/substring/concatenate, case conversion, searching, prefix/suffix, comparison, iteration, and repeated workloads. |
+| `arraylist_test.c` | Capacity and length, append/pop, indexed access and mutation, insertion/removal, clear/swap, sort/search/shuffle, callback indices, independent copies, and a one-million-element benchmark. |
+| `arraydeque_test.c` | FIFO/LIFO operations at both ends, underflow, resize, generic struct values, iteration order, length, and independent copies. |
+| `heap_test.c` | Min-heap and max-heap ordering, empty pop, resizing, struct elements, length, iteration, and independent copies. |
+| `hashmap_test.c` | Integer, C-string, `String`, and struct keys; insert/update/get/remove; resizing and tombstones; copying; key/value/item callbacks; and mutable value iteration. |
+| `hashset_test.c` | Insertion, duplicate suppression, membership/removal, independent copy, union/intersection/difference, iteration, and bulk operations. |
+| `frozenhashset_test.c` | Creation, length, membership, cached hashes, equality independent of insertion order, set operations, iteration, and bulk validation. |
+| `trie_test.c` | C-string and `String` insertion/search, complete words versus prefixes, duplicate insertion, missing entries, and empty-string behavior. |
+| `objpool_test.c` | Allocation, object values, remaining capacity, exhaustion, free-list reuse, and repeated full-pool allocation/release. |
+| `arenapool_test.c` | Creation, available space, sequential allocations, out-of-memory behavior, alignment, data integrity, and repeated allocations. |
+| `bytearray_test.c` | Lifecycle, reserve, growth, byte contents, cursor movement, overwrite, partial reads, read bounds, available bytes, and repeated single-byte writes. |
+| `bitset_test.c` | Bits at word boundaries, set/get/flip, clear/fill, any/all/none, copy, and AND/OR/XOR/NOT. |
+
+### Million-element performance test
+
+`arraylist_test.c` appends and reads **1,000,000 integers**, sorts the reverse-ordered collection, verifies every sorted value, and reports the total and sorting CPU times. The test intentionally reports measurements instead of enforcing a machine-dependent time limit.
+
+The expanded tests also cover fixes for empty-list sorting and merge-sort runs that do not have a matching pair, preservation of the logical size in copied deques, and the shared `BitSet` definition that previously prevented the library from compiling with its public header.
+
+## Basic usage
 
 ```c
-#include <stdio.h>
 #include "collections.h"
 
-int compare_ints(const void* a, const void* b) {
-    return (*(int*)a - *(int*)b);
-}
-
-void print_element(int index, const void* element) {
-    printf("[%d]: %d\n", index, *(int*)element);
-}
-
 int main(void) {
-    // Create ArrayList for integers (0 uses default capacity)
-    ArrayList list = arraylist_create(sizeof(int), 0);
+    ArrayList values = arraylist_create(sizeof(int), 0);
+    int first = 10;
+    int second = 20;
 
-    int values[] = {40, 10, 30, 20};
-    for (int i = 0; i < 4; i++) {
-        arraylist_append(&list, &values[i]);
+    arraylist_append(&values, &first);
+    arraylist_append(&values, &second);
+
+    int result = 0;
+    if (arraylist_get(&values, 1, &result)) {
+        /* result is 20 */
     }
 
-    // Sort in-place
-    arraylist_sort(&list, compare_ints);
-
-    // Map over elements
-    arraylist_map(&list, print_element);
-
-    // Pop element (removes 40)
-    int popped;
-    if (arraylist_pop(&list, &popped)) {
-        printf("Popped: %d\n", popped);
-    }
-
-    arraylist_free(list);
+    arraylist_free(&values);
     return 0;
 }
 ```
 
----
+Pass output buffers to operations that retrieve elements. Collections copy the configured number of bytes; when storing pointers, the collection copies the pointer value and does not take ownership of the pointed-to object. Call the matching `*_free` function for every initialized collection.
 
-### 2. ArrayDeque
-
-A double-ended queue implemented over a circular ring buffer.
-
-```c
-#include <stdio.h>
-#include "collections.h"
-
-int main(void) {
-    ArrayDeque deque = arraydeque_create(sizeof(int));
-
-    int a = 10, b = 20, c = 5;
-    arraydeque_append(&deque, &a);      // [10]
-    arraydeque_append(&deque, &b);      // [10, 20]
-    arraydeque_appendleft(&deque, &c);  // [5, 10, 20]
-
-    int front_out, back_out;
-    arraydeque_popleft(&deque, &front_out); // Pops 5
-    arraydeque_pop(&deque, &back_out);     // Pops 20
-
-    printf("Front: %d, Back: %d\n", front_out, back_out);
-
-    arraydeque_free(deque);
-    return 0;
-}
-```
-
----
-
-### 3. Heap (Priority Queue)
-
-A binary heap configured via a user-defined comparator function.
-
-```c
-#include <stdio.h>
-#include "collections.h"
-
-// Comparator for Min-Heap (smallest element on top)
-int min_heap_cmp(const void* a, const void* b) {
-    return (*(int*)a - *(int*)b);
-}
-
-int main(void) {
-    Heap min_heap = heap_create(sizeof(int), min_heap_cmp);
-
-    int items[] = {50, 10, 40, 5};
-    for (int i = 0; i < 4; i++) {
-        heap_push(&min_heap, &items[i]);
-    }
-
-    int top;
-    while (heap_pop(&min_heap, &top)) {
-        printf("%d ", top); // Output: 5 10 40 50
-    }
-    printf("\n");
-
-    heap_free(min_heap);
-    return 0;
-}
-```
-
----
-
-### 4. HashMap
-
-An open-addressed key-value map. `hashmap_set` returns `1` when replacing an existing key value, or `0` when inserting a new key.
-
-```c
-#include <stdio.h>
-#include <string.h>
-#include "collections.h"
-
-unsigned int string_hash(const void* key) {
-    const char* str = *(const char**)key;
-    unsigned int hash = 5381;
-    int c;
-    while ((c = *str++)) hash = ((hash << 5) + hash) + c;
-    return hash;
-}
-
-int string_equals(const void* a, const void* b) {
-    return strcmp(*(const char**)a, *(const char**)b) == 0;
-}
-
-int main(void) {
-    HashMap map = hashmap_create(
-        sizeof(char*), 
-        sizeof(int), 
-        string_equals, 
-        string_hash
-    );
-
-    const char* key = "score";
-    int val = 100;
-
-    // Insert new entry
-    hashmap_set(&map, &key, &val, NULL);
-
-    // Update entry (returns 1 on replacement)
-    int new_val = 150;
-    int old_val;
-    if (hashmap_set(&map, &key, &new_val, &old_val) == 1) {
-        printf("Updated key '%s'. Old value was %d\n", key, old_val);
-    }
-
-    int out;
-    if (hashmap_get(&map, &key, &out)) {
-        printf("Current '%s': %d\n", key, out);
-    }
-
-    hashmap_free(map);
-    return 0;
-}
-```
-
----
-
-### 5. HashSet
-
-A hash-based set guaranteeing unique entries.
-
-```c
-#include <stdio.h>
-#include "collections.h"
-
-unsigned int int_hash(const void* key) {
-    unsigned int x = *(const unsigned int*)key;
-    return ((x >> 16) ^ x) * 0x45d9f3b;
-}
-
-int int_equals(const void* a, const void* b) {
-    return *(const int*)a == *(const int*)b;
-}
-
-int main(void) {
-    HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
-
-    int val = 42;
-    hashset_add(&set, &val);
-    hashset_add(&set, &val); // Duplicate, ignored automatically
-
-    if (hashset_has(&set, &val)) {
-        printf("Set contains %d\n", val);
-    }
-
-    hashset_remove(&set, &val);
-    printf("Contains after removal: %d\n", hashset_has(&set, &val));
-
-    hashset_free(set);
-    return 0;
-}
-```
-
----
-
-## Convention & Design Notes
-
-1. **Pass-by-value output buffers**: Methods such as `get`, `pop`, and `remove` take an `out` pointer to copy the retrieved memory into:
-   ```c
-   int out_value;
-   hashmap_get(&map, &key, &out_value);
-   ```
-2. **Memory Safety**: Always call the corresponding `<collection>_free()` destructor to release heap-allocated buffers.
+Hash maps and sets need equality and hash callbacks compatible with the configured key/element type. Heaps and sorting operations need a comparator whose sign indicates ordering. Callback iteration order is unspecified for hash-based collections and heaps.

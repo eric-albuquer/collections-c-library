@@ -7,23 +7,44 @@
 #include <time.h>
 #include "collections.h"
 
-// --- STRUCT CUSTOMIZADA PARA TESTES ---
 typedef struct User {
     int id;
     int age;
 } User;
 
-// Função de hash customizada para a struct User
+static int enumerated_sum;
+static int enumerated_count;
+static bool enumerated_items_valid;
+
+static void accumulate_key(const void* key) {
+    enumerated_sum += *(const int*)key;
+    enumerated_count++;
+}
+
+static void accumulate_value(void* value) {
+    enumerated_sum += *(int*)value;
+    enumerated_count++;
+}
+
+static void validate_map_item(const void* key, void* value) {
+    if (*(const int*)value != *(const int*)key * 10) {
+        enumerated_items_valid = false;
+    }
+    enumerated_count++;
+}
+
+static void increment_map_value(void* value) {
+    (*(int*)value)++;
+}
+
 uint64_t user_hash(const void* value) {
     if (value == NULL) return 0;
     const User* u = (const User*)value;
-    // Mistura id e age usando constantes de dispersão
     uint64_t h = (uint64_t)u->id * 0xbf58476d1ce4e5b9ULL;
     h ^= (uint64_t)u->age * 0x94d049bb133111ebULL;
     return h ^ (h >> 31);
 }
 
-// Função de equals customizada para a struct User
 bool user_equals(const void* a, const void* b) {
     if (a == b) return true;
     if (a == NULL || b == NULL) return false;
@@ -32,11 +53,8 @@ bool user_equals(const void* a, const void* b) {
     return ua->id == ub->id && ua->age == ub->age;
 }
 
-// --- TESTES ---
 
-// Teste 1: Operações Básicas com Chaves Inteiras e Valores Inteiros
 void test_hashmap_basic_int(void) {
-    // Cria um HashMap com chave int e valor int
     HashMap map = hashmap_create(sizeof(int), sizeof(int), int_equals, int_hash);
     assert(hashmap_length(&map) == 0);
 
@@ -44,13 +62,11 @@ void test_hashmap_basic_int(void) {
     int k2 = 2, v2 = 200;
     int k3 = 3, v3 = 300;
 
-    // 1. Set de novos valores
     hashmap_set(&map, &k1, &v1, NULL);
     hashmap_set(&map, &k2, &v2, NULL);
     hashmap_set(&map, &k3, &v3, NULL);
     assert(hashmap_length(&map) == 3);
 
-    // 2. Get bem-sucedido
     int out = 0;
     assert(hashmap_get(&map, &k1, &out) == true);
     assert(out == 100);
@@ -58,34 +74,28 @@ void test_hashmap_basic_int(void) {
     assert(hashmap_get(&map, &k3, &out) == true);
     assert(out == 300);
 
-    // Get com chave inexistente
-    int k_inexistent = 99;
-    assert(hashmap_get(&map, &k_inexistent, &out) == false);
+    int k_missing = 99;
+    assert(hashmap_get(&map, &k_missing, &out) == false);
 
-    // 3. Atualização de valor existente e captação do old_value
-    int v1_new = 150;
+    int v1_updated = 150;
     int old_val = 0;
-    hashmap_set(&map, &k1, &v1_new, &old_val);
-    assert(old_val == 100); // Valor antigo capturado com sucesso
-    assert(hashmap_length(&map) == 3); // O tamanho não deve mudar ao atualizar
+    hashmap_set(&map, &k1, &v1_updated, &old_val);
+    assert(old_val == 100);
+    assert(hashmap_length(&map) == 3);
 
     assert(hashmap_get(&map, &k1, &out) == true);
     assert(out == 150);
 
-    // 4. Remoção de elementos
     assert(hashmap_remove(&map, &k2, &out) == true);
     assert(out == 200);
     assert(hashmap_length(&map) == 2);
 
-    // Remover chave já removida ou inexistente
     assert(hashmap_remove(&map, &k2, &out) == false);
     assert(hashmap_get(&map, &k2, &out) == false);
 
     hashmap_free(&map);
-    printf("[OK] Teste basico com inteiros concluido.\n");
 }
 
-// Teste 2: Testando com C-Strings (Chaves string, valores int)
 void test_hashmap_string_keys(void) {
     HashMap map = hashmap_create(sizeof(char*), sizeof(int), str_equals, str_hash);
 
@@ -107,17 +117,11 @@ void test_hashmap_string_keys(void) {
     assert(hashmap_get(&map, &missing_key, &out) == false);
 
     hashmap_free(&map);
-    printf("[OK] Teste com chaves C-string concluido.\n");
 }
 
-// Teste 3: Testando com a struct String da biblioteca
 void test_hashmap_custom_string_type(void) {
-    // Usamos string_equals e string_hash (adaptados para receber ponteiro para struct String, se aplicável, ou ponteiro para os dados internos)
-    // Nota: Certifique-se de que a sua lib forneça funcoes de hash/equals compatíveis com a struct String, 
-    // ou passamos os ponteiros adequados conforme a API da sua lib.
-    // Exemplo simulando ponteiros de String como chave:
-    HashMap map = hashmap_create(sizeof(String), sizeof(int), 
-        (bool(*)(const void*, const void*))string_equals, 
+    HashMap map = hashmap_create(sizeof(String), sizeof(int),
+        (bool(*)(const void*, const void*))string_equals,
         (uint64_t(*)(const void*))string_hash);
 
     String s1 = string_create("user_one");
@@ -139,10 +143,8 @@ void test_hashmap_custom_string_type(void) {
     string_free(&s2);
     hashmap_free(&map);
 
-    printf("[OK] Teste com struct String da biblioteca concluido.\n");
 }
 
-// Teste 4: Testando com Struct Customizada (User)
 void test_hashmap_struct_keys(void) {
     HashMap map = hashmap_create(sizeof(User), sizeof(int), user_equals, user_hash);
 
@@ -161,19 +163,15 @@ void test_hashmap_struct_keys(void) {
     assert(out == 95);
 
     hashmap_free(&map);
-    printf("[OK] Teste com struct customizada concluido.\n");
 }
 
-// Teste 5: Estresse e Redimensionamento Automático (Rehash / Load Factor)
 void test_hashmap_stress_and_rehash(void) {
-    printf("[BENCHMARK] Iniciando teste de estresse e redimensionamento do HashMap...\n");
 
     HashMap map = hashmap_create(sizeof(int), sizeof(int), int_equals, int_hash);
     int total = 10000;
 
     clock_t start = clock();
 
-    // Inserção massiva forçando redimensionamentos automáticos (rehash)
     for (int i = 0; i < total; i++) {
         int val = i * 2;
         hashmap_set(&map, &i, &val, NULL);
@@ -181,41 +179,96 @@ void test_hashmap_stress_and_rehash(void) {
 
     assert(hashmap_length(&map) == total);
 
-    // Validação de resgate de todos os elementos inseridos
     for (int i = 0; i < total; i++) {
         int out = 0;
         assert(hashmap_get(&map, &i, &out) == true);
         assert(out == i * 2);
     }
 
-    // Remoção em massa da metade dos elementos
     for (int i = 0; i < total / 2; i++) {
         int out = 0;
         assert(hashmap_remove(&map, &i, &out) == true);
         assert(out == i * 2);
+        assert(hashmap_get(&map, &i, &out) == false);
     }
 
     assert(hashmap_length(&map) == total / 2);
+    for (int i = 0; i < total / 2; i++) {
+        int value = -i;
+        hashmap_set(&map, &i, &value, NULL);
+    }
+    assert(hashmap_length(&map) == total);
+    for (int i = total / 2; i < total; i++) {
+        int out = 0;
+        assert(hashmap_get(&map, &i, &out) == true);
+        assert(out == i * 2);
+    }
+    for (int i = 0; i < total / 2; i++) {
+        int out = 0;
+        assert(hashmap_get(&map, &i, &out) == true);
+        assert(out == -i);
+    }
 
     hashmap_free(&map);
 
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("HashMap benchmark: %d keys inserted and queried in %.6f seconds.\n",
+           total, total_time);
 
-    printf(" -> Inseridas e consultadas %d chaves com sucesso.\n", total);
-    printf(" -> Tempo total do teste de estresse: %.6f segundos\n", total_time);
-    printf("[OK] Teste de estresse e rehash concluido com sucesso!\n");
+}
+
+void test_hashmap_copy_and_iteration(void) {
+    HashMap original = hashmap_create(sizeof(int), sizeof(int), int_equals, int_hash);
+    for (int key = 1; key <= 3; key++) {
+        int value = key * 10;
+        hashmap_set(&original, &key, &value, NULL);
+    }
+
+    HashMap copy = hashmap_copy(&original);
+    assert(hashmap_length(&copy) == 3);
+
+    enumerated_sum = 0;
+    enumerated_count = 0;
+    hashmap_keys(&copy, accumulate_key);
+    assert(enumerated_count == 3);
+    assert(enumerated_sum == 6);
+
+    enumerated_sum = 0;
+    enumerated_count = 0;
+    hashmap_values(&copy, accumulate_value);
+    assert(enumerated_count == 3);
+    assert(enumerated_sum == 60);
+
+    enumerated_count = 0;
+    enumerated_items_valid = true;
+    hashmap_items(&copy, validate_map_item);
+    assert(enumerated_count == 3);
+    assert(enumerated_items_valid);
+
+    hashmap_values(&copy, increment_map_value);
+    for (int key = 1; key <= 3; key++) {
+        int original_value = 0;
+        int copied_value = 0;
+        assert(hashmap_get(&original, &key, &original_value));
+        assert(hashmap_get(&copy, &key, &copied_value));
+        assert(original_value == key * 10);
+        assert(copied_value == key * 10 + 1);
+    }
+
+    hashmap_free(&original);
+    hashmap_free(&copy);
 }
 
 int main(void) {
-    printf("--- Executando testes robustos para HashMap ---\n\n");
 
     test_hashmap_basic_int();
     test_hashmap_string_keys();
     test_hashmap_custom_string_type();
     test_hashmap_struct_keys();
     test_hashmap_stress_and_rehash();
+    test_hashmap_copy_and_iteration();
 
-    printf("\n--- Todos os testes do HashMap passaram com sucesso! 🎉 ---\n");
+    puts("All tests passed.");
     return 0;
 }
