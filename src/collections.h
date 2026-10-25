@@ -99,8 +99,8 @@ typedef struct ArrayList {
     int _element_size;
     int _size;
 
-    unsigned char* _swap_buffer;
-    unsigned char* _memory;
+    uint8_t* _swap_buffer;
+    uint8_t* _memory;
 } ArrayList;
 
 ArrayList arraylist_create(int element_size, int initial_size);
@@ -142,7 +142,7 @@ typedef struct ArrayDeque {
     int _head;
     int _tail;
 
-    unsigned char* _memory;
+    uint8_t* _memory;
 } ArrayDeque;
 
 ArrayDeque arraydeque_create(int element_size);
@@ -170,7 +170,7 @@ typedef struct Heap {
     int (*_cmp)(const void*, const void*);
 
     int _size;
-    unsigned char* _memory;
+    uint8_t* _memory;
 } Heap;
 
 Heap heap_create(int element_size, int (*cmp)(const void*, const void*));
@@ -201,10 +201,10 @@ typedef struct HashMap {
     int _value_size;
     int _size;
 
-    unsigned char* _states;
+    uint8_t* _states;
     uint64_t* _hash_cache;
-    unsigned char* _keys;
-    unsigned char* _values;
+    uint8_t* _keys;
+    uint8_t* _values;
 } HashMap;
 
 HashMap hashmap_create(
@@ -242,9 +242,9 @@ typedef struct HashSet {
     int _element_size;
     int _size;
 
-    unsigned char* _states;
+    uint8_t* _states;
     uint64_t* _hash_cache;
-    unsigned char* _elements;
+    uint8_t* _elements;
 } HashSet;
 
 HashSet hashset_create(
@@ -303,7 +303,7 @@ typedef struct ObjectPool {
     int _used;
 
     int _head;
-    unsigned char* _memory;
+    uint8_t* _memory;
 } ObjectPool;
 
 ObjectPool objpool_create(int max_capacity, int obj_size);
@@ -322,12 +322,35 @@ typedef struct ArenaPool {
     int _capacity;
     int _used;
 
-    unsigned char* _memory;
+    uint8_t* _memory;
 } ArenaPool;
 
 ArenaPool arenapool_create(int total_bytes);
 void arenapool_free(ArenaPool* arena);
 
+int arenapool_available(ArenaPool* arena);
+
 void* arenapool_malloc(ArenaPool* arena, int byte_count);
+
+// ==========================================================
+// BYTE ARRAY
+// ==========================================================
+
+typedef struct ByteArray {
+    int _capacity;
+    int _size;
+    int _cursor;
+    uint8_t* _data;
+} ByteArray;
+
+ByteArray bytearray_create(int initial_capacity);
+void bytearray_free(ByteArray* bytearray);
+void bytearray_reserve(ByteArray* bytearray, int new_capacity);
+void bytearray_clear(ByteArray* bytearray);
+void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, int size);
+int bytearray_read_bytes(ByteArray* bytearray, void* out, int size);
+
+bool bytearray_seek(ByteArray* bytearray, int offset);
+int bytearray_available(const ByteArray* bytearray);
 
 #endif

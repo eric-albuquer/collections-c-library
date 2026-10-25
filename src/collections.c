@@ -49,7 +49,7 @@ bool str_equals(const void* a, const void* b) {
 
 uint64_t char_hash(const void* value) {
     if (value == NULL) return 0;
-    return (uint64_t)(unsigned char)(*(const char*)value);
+    return (uint64_t)(uint8_t)(*(const char*)value);
 }
 
 uint64_t long_long_hash(const void* value) {
@@ -105,7 +105,7 @@ uint64_t str_hash(const void* value) {
     uint64_t hash = 14695981039346656037ULL;
     int c;
 
-    while ((c = (unsigned char)*str++)) {
+    while ((c = (uint8_t)*str++)) {
         hash ^= c;
         hash *= 1099511628211ULL;
     }
@@ -311,15 +311,11 @@ int string_compare(const String* a, const String* b) {
 
 void string_extend(String* a, const String* b) {
     a->_hash_computed = false;
-    int idx = --a->_size;
-    for (int i = 0; i < b->_size; i++){
-        if (idx == a->_capacity)
-            string_resize(a);
-        
-        a->_memory[idx] = b->_memory[i];
-        idx++;
-    }
-    a->_size += b->_size;
+    const int idx = a->_size - 1;
+    a->_size += b->_size - 1;
+    while(a->_size > a->_capacity)
+        string_resize(a);
+    memcpy(a->_memory + idx, b->_memory, b->_size);
 }
 
 static inline void build_shift_table(const char* pattern, int m, int* bad_char) {
@@ -328,7 +324,7 @@ static inline void build_shift_table(const char* pattern, int m, int* bad_char) 
     }
 
     for (int i = 0; i < m - 1; i++) {
-        unsigned char c = (unsigned char)pattern[i];
+        uint8_t c = (uint8_t)pattern[i];
         bad_char[c] = m - 1 - i;
     }
 }
@@ -356,7 +352,7 @@ int string_index_of(const String* a, const String* b) {
             return i;
         }
 
-        unsigned char mismatched_char = (unsigned char)a->_memory[i + m - 1];
+        uint8_t mismatched_char = (uint8_t)a->_memory[i + m - 1];
         i += bad_char[mismatched_char];
     }
 
@@ -403,7 +399,7 @@ static inline void arraylist_resize(ArrayList* list){
 }
 
 ArrayList arraylist_create(int element_size, int initial_capacity) {
-    initial_capacity = initial_capacity < START_CAPACITY ? START_CAPACITY : initial_capacity;
+    initial_capacity = int_max(initial_capacity, START_CAPACITY);
     ArrayList list = {
         ._capacity = initial_capacity,
         ._element_size = element_size,
@@ -528,7 +524,7 @@ static inline void insertion_sort(ArrayList* list, int left, int right, int(*cmp
     }  
 }
 
-static inline void merge(ArrayList* list, unsigned char* aux, int l, int m, int r, int(*cmp)(const void*, const void*)) {
+static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, int(*cmp)(const void*, const void*)) {
     int i = l;
     int j = m;
     int k = l;
@@ -569,12 +565,12 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
     if (min_run == n)
         return;
 
-    unsigned char* aux = malloc(list->_element_size * list->_size);
+    uint8_t* aux = malloc(list->_element_size * list->_size);
     
     int size = min_run;
     while (size < n) {
         const int double_size = size * 2;
-        unsigned char* temp = list->_memory;
+        uint8_t* temp = list->_memory;
         list->_memory = aux;
         aux = temp;
         for (int i = 0; i < n; i += double_size){
@@ -594,7 +590,7 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
 int arraylist_bsearch(const ArrayList* list, const void* element, int(*cmp)(const void*, const void*)) {
     void* idx = bsearch(element, list->_memory, list->_size, list->_element_size, cmp);
     if (idx == NULL) return -1;
-    return (((unsigned char*)idx) - list->_memory) / list->_element_size;
+    return (((uint8_t*)idx) - list->_memory) / list->_element_size;
 }
 
 ArrayList arraylist_copy(const ArrayList* list) {
@@ -624,7 +620,7 @@ static inline void arraydeque_resize(ArrayDeque* deque) {
     deque->_capacity <<= 1;
     deque->_mask = deque->_capacity - 1;
 
-    unsigned char* old_memory = deque->_memory;
+    uint8_t* old_memory = deque->_memory;
     deque->_memory = malloc(deque->_element_size * deque->_capacity);
 
     memcpy(
@@ -905,9 +901,9 @@ static inline void hashmap_resize(HashMap* map) {
     int new_mask = new_capacity - 1;
 
     uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
-    unsigned char* new_states = calloc(new_capacity, sizeof(unsigned char));
-    unsigned char* new_keys = malloc(map->_key_size * new_capacity);
-    unsigned char* new_values = malloc(map->_value_size * new_capacity);
+    uint8_t* new_states = calloc(new_capacity, sizeof(uint8_t));
+    uint8_t* new_keys = malloc(map->_key_size * new_capacity);
+    uint8_t* new_values = malloc(map->_value_size * new_capacity);
 
     for (int i = 0; i < map->_capacity; i++){
         if (map->_states[i] != USED) 
@@ -967,7 +963,7 @@ HashMap hashmap_create(
         ._hash = hash,
         ._size = 0,
         ._hash_cache = malloc(sizeof(uint64_t) * START_CAPACITY),
-        ._states = calloc(START_CAPACITY, sizeof(unsigned char)),
+        ._states = calloc(START_CAPACITY, sizeof(uint8_t)),
         ._keys = malloc(START_CAPACITY * key_size),
         ._values = malloc(START_CAPACITY * value_size)
     };
@@ -1115,8 +1111,8 @@ static inline void hashset_resize(HashSet* set) {
     int new_mask = new_capacity - 1;
 
     uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
-    unsigned char* new_states = calloc(new_capacity, sizeof(unsigned char));
-    unsigned char* new_elements = malloc(set->_element_size * new_capacity);
+    uint8_t* new_states = calloc(new_capacity, sizeof(uint8_t));
+    uint8_t* new_elements = malloc(set->_element_size * new_capacity);
 
     for (int i = 0; i < set->_capacity; i++){
         if (set->_states[i] != USED) 
@@ -1167,7 +1163,7 @@ HashSet hashset_create(
         ._hash = hash,
         ._size = 0,
         ._hash_cache = malloc(sizeof(uint64_t) * START_CAPACITY),
-        ._states = calloc(START_CAPACITY, sizeof(unsigned char)),
+        ._states = calloc(START_CAPACITY, sizeof(uint8_t)),
         ._elements = malloc(element_size * START_CAPACITY)
     };
 
@@ -1336,7 +1332,7 @@ static inline uint64_t mix_bits(uint64_t val) {
     return val;
 }
 
-static uint64_t hash_element_bytes(const unsigned char* data, size_t size) {
+static uint64_t hash_element_bytes(const uint8_t* data, size_t size) {
     uint64_t hash = 14695981039346656037ULL;
     for (size_t i = 0; i < size; i++) {
         hash ^= data[i];
@@ -1427,7 +1423,7 @@ void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const vo
 // ==========================================================
 
 ObjectPool objpool_create(int max_capacity, int obj_size) {
-    obj_size = int_max(obj_size, sizeof(int));
+    obj_size = int_max(obj_size, sizeof(uint64_t));
     ObjectPool pool = {
         ._capacity = max_capacity,
         ._obj_size = obj_size,
@@ -1464,7 +1460,7 @@ void* objpool_malloc(ObjectPool* pool) {
 
 void objpool_free_obj(ObjectPool* pool, void* obj) {
     *(int*)obj = pool->_head;
-    pool->_head = ((unsigned char*)obj - pool->_memory) / pool->_obj_size;
+    pool->_head = ((uint8_t*)obj - pool->_memory) / pool->_obj_size;
     pool->_used--;
 }
 
@@ -1487,11 +1483,79 @@ void arenapool_free(ArenaPool* arena) {
     arena->_memory = NULL;
 }
 
+int arenapool_available(ArenaPool* arena) {
+    return arena->_capacity - arena->_used;
+}
+
 void* arenapool_malloc(ArenaPool* arena, int byte_count) {
+    byte_count = (byte_count + 7) & ~7;
     if (arena->_used + byte_count > arena->_capacity)
         return NULL;
 
     void* mem = arena->_memory + arena->_used;
     arena->_used += byte_count;
     return mem;
+}
+
+// ==========================================================
+// BYTE ARRAY
+// ==========================================================
+
+static inline void bytearray_resize(ByteArray* bytearray) {
+    bytearray->_capacity <<= 1;
+    bytearray->_data = realloc(bytearray->_data, bytearray->_capacity);
+}
+
+ByteArray bytearray_create(int initial_capacity) {
+    initial_capacity = int_max(initial_capacity, 0);
+    ByteArray bytearray = {
+        ._capacity = initial_capacity,
+        ._size = 0,
+        ._cursor = 0,
+        ._data = malloc(initial_capacity)
+    };
+
+    return bytearray;
+}
+
+void bytearray_free(ByteArray* bytearray) {
+    free(bytearray->_data);
+    bytearray->_data = NULL;
+}
+
+void bytearray_reserve(ByteArray* bytearray, int new_capacity) {
+    if (new_capacity <= bytearray->_capacity)
+        return;
+    bytearray->_data = realloc(bytearray->_data, new_capacity);
+    bytearray->_capacity = new_capacity;
+}
+
+void bytearray_clear(ByteArray* bytearray) {
+    bytearray->_size = 0;
+    bytearray->_cursor = 0;
+}
+
+void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, int size) {
+    while(bytearray->_cursor + size > bytearray->_capacity)
+        bytearray_resize(bytearray);
+    memcpy(bytearray->_data + bytearray->_cursor, bytes, size);
+    bytearray->_cursor += size;
+    bytearray->_size = int_max(bytearray->_size, bytearray->_cursor);
+}
+
+int bytearray_read_bytes(ByteArray* bytearray, void* out, int size) {
+    int bytes_to_read = int_min((unsigned int)size, bytearray->_size - bytearray->_cursor);
+    memcpy(out, bytearray->_data + bytearray->_cursor, bytes_to_read);
+    bytearray->_cursor += bytes_to_read;
+    return bytes_to_read;
+}
+
+bool bytearray_seek(ByteArray* bytearray, int offset) {
+    if ((unsigned int)offset >= bytearray->_capacity)
+        return 0;
+    bytearray->_cursor = offset;
+}
+
+int bytearray_available(const ByteArray* bytearray) {
+    return bytearray->_size - bytearray->_cursor;
 }
