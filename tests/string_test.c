@@ -178,6 +178,6 @@ int main() {
     test_string_correctness();
     test_string_performance();
 
-    puts("All tests passed.");
+    puts("All String tests passed.");
     return 0;
 }

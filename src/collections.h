@@ -409,6 +409,7 @@ void bitset_fill(BitSet* bitset, bool value);
 void bitset_set(BitSet* bitset, int bit);
 bool bitset_get(const BitSet* bitset, int bit);
 void bitset_flip(BitSet* bitset, int bit);
+void bitset_reset(BitSet* bitset, int bit);
 
 BitSet bitset_and(const BitSet* a, const BitSet* b);
 BitSet bitset_or(const BitSet* a, const BitSet* b);
@@ -418,5 +419,28 @@ BitSet bitset_not(const BitSet* a);
 bool bitset_any(const BitSet* bitset);
 bool bitset_all(const BitSet* bitset);
 bool bitset_none(const BitSet* bitset);
+
+int bitset_first(const BitSet* bitset);
+int bitset_last(const BitSet* bitset);
+
+// ==========================================================
+// INDEXED PRIORITY QUEUE
+// ==========================================================
+
+typedef struct IndexedPriorityQueue {
+    int _element_size;
+    int _size;
+    int _priority_count;
+    BitSet _min_bucket_reference;
+    ArrayDeque* _buckets;
+} IndexedPriorityQueue;
+
+IndexedPriorityQueue indexedpq_create(int element_size, int priority_count);
+void indexedpq_free(IndexedPriorityQueue* ipq);
+
+bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* element);
+bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, int* priority_out);
+
+int indexedpq_length(const IndexedPriorityQueue* ipq);
 
 #endif

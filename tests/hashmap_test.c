@@ -269,6 +269,6 @@ int main(void) {
     test_hashmap_stress_and_rehash();
     test_hashmap_copy_and_iteration();
 
-    puts("All tests passed.");
+    puts("All HashMap tests passed.");
     return 0;
 }

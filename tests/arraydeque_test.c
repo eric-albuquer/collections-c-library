@@ -182,6 +182,6 @@ int main(void) {
     test_arraydeque_copy_and_foreach();
     test_arraydeque_wraparound_resize();
 
-    puts("All tests passed.");
+    puts("All ArrayDeque tests passed.");
     return 0;
 }

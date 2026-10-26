@@ -172,6 +172,6 @@ int main(void) {
     test_bytearray_seek_and_overwrite();
     test_bytearray_performance_and_stress();
 
-    puts("All tests passed.");
+    puts("All ByteArray tests passed.");
     return 0;
 }

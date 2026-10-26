@@ -547,7 +547,8 @@ bool arraylist_remove_index(ArrayList* list, int idx, void* out) {
     if((unsigned int)idx >= list->_size)
         return 0;
 
-    memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
+    if (out)
+        memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
     list->_size--;
 
     for (int i = idx; i < list->_size; i++){
@@ -574,7 +575,8 @@ bool arraylist_pop(ArrayList* list, void* out) {
         return 0;
 
     list->_size--;
-    memcpy(out, list->_memory + list->_size * list->_element_size, list->_element_size);
+    if (out)
+        memcpy(out, list->_memory + list->_size * list->_element_size, list->_element_size);
     return 1;
 }
 
@@ -794,11 +796,12 @@ bool arraydeque_pop(ArrayDeque* deque, void* out) {
 
     deque->_tail = (deque->_tail - 1 + deque->_capacity) & deque->_mask;
 
-    memcpy(
-        out,
-        deque->_memory + deque->_tail * deque->_element_size,
-        deque->_element_size
-    );
+    if (out)
+        memcpy(
+            out,
+            deque->_memory + deque->_tail * deque->_element_size,
+            deque->_element_size
+        );
 
     deque->_size--;
     return 1;
@@ -808,11 +811,12 @@ bool arraydeque_popleft(ArrayDeque* deque, void* out) {
     if (deque->_size == 0) 
         return 0;
 
-    memcpy(
-        out,
-        deque->_memory + deque->_head * deque->_element_size,
-        deque->_element_size
-    );
+    if (out)
+        memcpy(
+            out,
+            deque->_memory + deque->_head * deque->_element_size,
+            deque->_element_size
+        );
 
     deque->_head = (deque->_head + 1) & deque->_mask;
     deque->_size--;
@@ -902,11 +906,12 @@ bool heap_pop(Heap* heap, void* out) {
     if (heap->_size == 0)
         return 0; 
 
-    memcpy(
-        out,
-        heap->_memory,
-        heap->_element_size
-    );
+    if (out)
+        memcpy(
+            out,
+            heap->_memory,
+            heap->_element_size
+        );
     heap->_size--;
 
     if (heap->_size == 0)
@@ -1119,11 +1124,12 @@ bool hashmap_get(const HashMap* map, const void* key, void* out) {
         if (map->_states[idx] == HASHTABLE_EMPTY)
             return 0;
         if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
-            memcpy(
-                out,
-                map->_values + idx * map->_value_size,
-                map->_value_size
-            );
+            if (out)
+                memcpy(
+                    out,
+                    map->_values + idx * map->_value_size,
+                    map->_value_size
+                );
             return 1;
         }
         idx = (idx + step) & map->_mask;
@@ -1738,7 +1744,8 @@ void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, int size) {
 
 int bytearray_read_bytes(ByteArray* bytearray, void* out, int size) {
     int bytes_to_read = int_min((unsigned int)size, bytearray->_size - bytearray->_cursor);
-    memcpy(out, bytearray->_data + bytearray->_cursor, bytes_to_read);
+    if (out)
+        memcpy(out, bytearray->_data + bytearray->_cursor, bytes_to_read);
     bytearray->_cursor += bytes_to_read;
     return bytes_to_read;
 }
@@ -1806,6 +1813,11 @@ void bitset_flip(BitSet* bitset, int bit) {
     bitset->_data[idx] ^= (1ULL << (bit & BITSET_MASK));
 }
 
+void bitset_reset(BitSet* bitset, int bit) {
+    const int idx = bit >> BITSET_SHIFT;
+    bitset->_data[idx] &= ~(1ULL << (bit & BITSET_MASK));
+}
+
 BitSet bitset_and(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
     for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
@@ -1858,4 +1870,123 @@ bool bitset_none(const BitSet* bitset) {
         if (bitset->_data[i] != 0) return 0;
 
     return 1;
+}
+
+#if defined(_MSC_VER)
+    #include <intrin.h>
+#endif
+
+int bitset_first(const BitSet* bitset) {
+    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++){
+        if (bitset->_data[i] == 0)
+            continue;
+        int bit = i << BITSET_SHIFT;
+        uint64_t val = bitset->_data[i];
+
+        #if defined(_MSC_VER)
+            unsigned long index;
+            _BitScanForward64(&index, val);
+            bit += (int)index;
+        #elif defined(__GNUC__) || defined(__clang__)
+            bit += __builtin_ctzll(val);
+        #else
+            int pos = 0;
+            if ((val & 0xFFFFFFFF) == 0) { val >>= 32; pos += 32; }
+            if ((val & 0xFFFF) == 0)     { val >>= 16; pos += 16; }
+            if ((val & 0xFF) == 0)       { val >>= 8;  pos += 8;  }
+            if ((val & 0xF) == 0)        { val >>= 4;  pos += 4;  }
+            if ((val & 0x3) == 0)        { val >>= 2;  pos += 2;  }
+            if ((val & 0x1) == 0)        { pos += 1; }
+            bit += pos;
+        #endif
+        return bit;
+    }
+
+    return -1;
+}
+
+int bitset_last(const BitSet* bitset) {
+    for (int i = (bitset->_size >> BITSET_SHIFT) - 1; i >= 0; i--){
+        if (bitset->_data[i] == 0)
+            continue;
+        int bit = i << BITSET_SHIFT;
+        uint64_t val = bitset->_data[i];
+        #if defined(_MSC_VER)
+            unsigned long index;
+            _BitScanReverse64(&index, val);
+            bit += (int)index;
+        #elif defined(__GNUC__) || defined(__clang__)
+            bit += 63 - __builtin_clzll(val);
+        #else
+            int pos = 0;
+            if (val >= 0x100000000ULL) { val >>= 32; pos += 32; }
+            if (val >= 0x00010000ULL)  { val >>= 16; pos += 16; }
+            if (val >= 0x00000100ULL)  { val >>= 8;  pos += 8;  }
+            if (val >= 0x00000010ULL)  { val >>= 4;  pos += 4;  }
+            if (val >= 0x00000004ULL)  { val >>= 2;  pos += 2;  }
+            if (val >= 0x00000002ULL)  { pos += 1; }
+            bit += pos;
+        #endif
+        return bit;
+    }
+    return -1;
+}
+
+// ==========================================================
+// INDEXED PRIORITY QUEUE
+// ==========================================================
+
+IndexedPriorityQueue indexedpq_create(int element_size, int priority_count) {
+    IndexedPriorityQueue ipq = {
+        ._priority_count = priority_count,
+        ._element_size = element_size,
+        ._size = 0,
+        ._min_bucket_reference = bitset_create(priority_count),
+        ._buckets = malloc(sizeof(ArrayDeque) * priority_count)
+    };
+
+    for (int i = 0; i < priority_count; i++){
+        ipq._buckets[i] = arraydeque_create(element_size);
+    }
+
+    return ipq;
+}
+
+void indexedpq_free(IndexedPriorityQueue* ipq) {
+    for (int i = 0; i < ipq->_priority_count; i++){
+        arraydeque_free(&ipq->_buckets[i]);
+    }
+
+    free(ipq->_buckets);
+    ipq->_buckets = NULL;
+
+    bitset_free(&ipq->_min_bucket_reference);
+}
+
+bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* element) {
+    if ((uint32_t)priority >= ipq->_priority_count)
+        return 0;
+    arraydeque_append(&ipq->_buckets[priority], element);
+    bitset_set(&ipq->_min_bucket_reference, priority);
+    ipq->_size++;
+    return 1;
+}
+
+bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, int* priority_out) {
+    if (ipq->_size == 0)
+        return 0;
+    uint32_t min_priority = bitset_first(&ipq->_min_bucket_reference);
+    arraydeque_popleft(&ipq->_buckets[min_priority], out);
+    if (priority_out)
+        *priority_out = min_priority;
+
+    if (arraydeque_length(&ipq->_buckets[min_priority]) == 0)
+        bitset_reset(&ipq->_min_bucket_reference, min_priority);
+
+    ipq->_size--;
+    return 1;
+}
+
+int indexedpq_length(const IndexedPriorityQueue* ipq) {
+    return ipq->_size;
 }

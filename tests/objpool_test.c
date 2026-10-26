@@ -140,6 +140,6 @@ int main(void) {
     test_objpool_capacity_limits();
     test_objpool_stress_and_performance();
 
-    puts("All tests passed.");
+    puts("All ObjPool tests passed.");
     return 0;
 }

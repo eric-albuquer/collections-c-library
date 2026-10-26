@@ -176,6 +176,6 @@ int main(void) {
     test_hashset_foreach();
     test_hashset_stress_and_performance();
 
-    puts("All tests passed.");
+    puts("All HashSet tests passed.");
     return 0;
 }

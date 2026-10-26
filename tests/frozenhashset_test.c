@@ -194,6 +194,6 @@ int main(void) {
     test_frozenhashset_foreach();
     test_frozenhashset_stress_and_performance();
 
-    puts("All tests passed.");
+    puts("All FrozenHashSet tests passed.");
     return 0;
 }

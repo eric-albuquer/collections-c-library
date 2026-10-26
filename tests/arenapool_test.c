@@ -133,6 +133,6 @@ int main(void) {
     test_arenapool_data_integrity();
     test_arenapool_performance_and_stress();
 
-    puts("All tests passed.");
+    puts("All ArenaPool tests passed.");
     return 0;
 }

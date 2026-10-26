@@ -86,6 +86,6 @@ int main() {
 
     test_trie_edge_cases();
 
-    puts("All tests passed.");
+    puts("All Trie tests passed.");
     return 0;
 }

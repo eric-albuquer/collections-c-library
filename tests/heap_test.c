@@ -173,6 +173,6 @@ int main(void) {
     test_heap_structs();
     test_heap_length_copy_and_foreach();
 
-    puts("All tests passed.");
+    puts("All Pool tests passed.");
     return 0;
 }

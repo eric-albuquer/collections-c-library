@@ -4,7 +4,6 @@
 #include "collections.h"
 
 void test_bitset_basic() {
-
     BitSet bs = bitset_create(128);
 
     assert(bitset_none(&bs) == true);
@@ -39,7 +38,6 @@ void test_bitset_basic() {
 }
 
 void test_bitset_fill() {
-
     BitSet bs = bitset_create(100);
 
     bitset_fill(&bs, true);
@@ -54,7 +52,6 @@ void test_bitset_fill() {
 }
 
 void test_bitset_logic_operations() {
-
     BitSet a = bitset_create(64);
     BitSet b = bitset_create(64);
 
@@ -97,17 +94,52 @@ void test_bitset_logic_operations() {
 
     bitset_free(&a);
     bitset_free(&b);
+}
 
+void test_bitset_new_methods() {
+    BitSet bs = bitset_create(150);
+
+    assert(bitset_first(&bs) == -1);
+    assert(bitset_last(&bs) == -1);
+
+    bitset_set(&bs, 42);
+    assert(bitset_get(&bs, 42) == true);
+    bitset_reset(&bs, 42);
+    assert(bitset_get(&bs, 42) == false);
+    assert(bitset_first(&bs) == -1);
+
+    bitset_set(&bs, 10);
+    bitset_set(&bs, 65);  
+    bitset_set(&bs, 140);
+
+    assert(bitset_first(&bs) == 10);
+    assert(bitset_last(&bs) == 140);
+
+    bitset_reset(&bs, 10);
+    assert(bitset_first(&bs) == 65);
+
+    bitset_reset(&bs, 140);
+    assert(bitset_last(&bs) == 65);
+
+    assert(bitset_first(&bs) == 65);
+    assert(bitset_last(&bs) == 65);
+
+    bitset_clear(&bs);
+    bitset_set(&bs, 0);
+    bitset_set(&bs, 63);
+
+    assert(bitset_first(&bs) == 0);
+    assert(bitset_last(&bs) == 63);
+
+    bitset_free(&bs);
 }
 
 int main() {
-
     test_bitset_basic();
-
     test_bitset_fill();
-
     test_bitset_logic_operations();
+    test_bitset_new_methods();
 
-    puts("All tests passed.");
+    puts("All BitSet tests passed.");
     return 0;
 }

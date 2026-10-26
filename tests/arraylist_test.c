@@ -320,6 +320,6 @@ int main(void) {
     test_arraylist_copy();
     test_arraylist_performance_and_stress();
 
-    puts("All tests passed.");
+    puts("All ArrayList tests passed.");
     return 0;
 }
