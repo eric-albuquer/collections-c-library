@@ -62,6 +62,10 @@ for source in tests/*.c; do
 done
 ```
 
+```sh
+for file in ./tests/*.c; do gcc -Isrc "$file" ./src/collections.c -o test_bin && ./test_bin || break; done;
+```
+
 ### Run every suite in Windows PowerShell
 
 ```powershell

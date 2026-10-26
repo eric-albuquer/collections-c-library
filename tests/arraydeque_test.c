@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <assert.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 #include "collections.h"
 
-static int foreach_sum;
+static long long foreach_sum;
 static int foreach_count;
 static bool foreach_indices_valid;
 
@@ -16,29 +19,29 @@ static void accumulate_deque_element(int index, void* element) {
 
 void test_arraydeque_basic(void) {
     ArrayDeque deque = arraydeque_create(sizeof(int));
-    assert(deque._size == 0);
+    assert(arraydeque_length(&deque) == 0);
 
     int val1 = 10, val2 = 20, val3 = 30;
     arraydeque_append(&deque, &val1);
     arraydeque_append(&deque, &val2);
     arraydeque_append(&deque, &val3);
 
-    assert(deque._size == 3);
+    assert(arraydeque_length(&deque) == 3);
 
     int out = 0;
-    assert(arraydeque_popleft(&deque, &out) == 1);
+    assert(arraydeque_popleft(&deque, &out) == true);
     assert(out == 10);
 
-    assert(arraydeque_popleft(&deque, &out) == 1);
+    assert(arraydeque_popleft(&deque, &out) == true);
     assert(out == 20);
 
-    assert(arraydeque_popleft(&deque, &out) == 1);
+    assert(arraydeque_popleft(&deque, &out) == true);
     assert(out == 30);
 
-    assert(deque._size == 0);
+    assert(arraydeque_length(&deque) == 0);
 
-    assert(arraydeque_popleft(&deque, &out) == 0);
-    assert(arraydeque_pop(&deque, &out) == 0);
+    assert(arraydeque_popleft(&deque, &out) == false);
+    assert(arraydeque_pop(&deque, &out) == false);
 
     arraydeque_free(&deque);
 }
@@ -52,16 +55,16 @@ void test_arraydeque_stack_and_deque_ops(void) {
     arraydeque_appendleft(&deque, &v2);
     arraydeque_appendleft(&deque, &v3);
 
-    assert(deque._size == 3);
+    assert(arraydeque_length(&deque) == 3);
 
     int out;
-    assert(arraydeque_pop(&deque, &out) == 1);
+    assert(arraydeque_pop(&deque, &out) == true);
     assert(out == 100);
 
-    assert(arraydeque_popleft(&deque, &out) == 1);
+    assert(arraydeque_popleft(&deque, &out) == true);
     assert(out == 300);
 
-    assert(deque._size == 1);
+    assert(arraydeque_length(&deque) == 1);
 
     arraydeque_free(&deque);
 }
@@ -74,16 +77,16 @@ void test_arraydeque_stress_and_resize(void) {
         arraydeque_append(&deque, &i);
     }
 
-    assert(deque._size == total_elements);
+    assert(arraydeque_length(&deque) == total_elements);
 
     for (int i = 0; i < total_elements; i++) {
         int out = -1;
-        int status = arraydeque_popleft(&deque, &out);
-        assert(status == 1);
+        bool status = arraydeque_popleft(&deque, &out);
+        assert(status == true);
         assert(out == i);
     }
 
-    assert(deque._size == 0);
+    assert(arraydeque_length(&deque) == 0);
 
     arraydeque_free(&deque);
 }
@@ -103,10 +106,10 @@ void test_arraydeque_generic_types(void) {
     arraydeque_append(&deque, &p2);
 
     Point out;
-    assert(arraydeque_popleft(&deque, &out) == 1);
+    assert(arraydeque_popleft(&deque, &out) == true);
     assert(out.x == 10 && out.y == 20);
 
-    assert(arraydeque_popleft(&deque, &out) == 1);
+    assert(arraydeque_popleft(&deque, &out) == true);
     assert(out.x == 30 && out.y == 40);
 
     arraydeque_free(&deque);
@@ -173,14 +176,60 @@ void test_arraydeque_wraparound_resize(void) {
     arraydeque_free(&deque);
 }
 
-int main(void) {
+void test_arraydeque_performance(void) {
+    const int num_operations = 1000000; // 1 million operations
+    ArrayDeque deque = arraydeque_create(sizeof(int));
 
+    clock_t start_time = clock();
+
+    // 1. Alternating Append & AppendLeft (Triggers Ring Buffer Wraparound)
+    for (int i = 0; i < num_operations / 2; i++) {
+        arraydeque_append(&deque, &i);
+        arraydeque_appendleft(&deque, &i);
+    }
+
+    assert(arraydeque_length(&deque) == num_operations);
+
+    // 2. Traversal & Deep Copy under Heavy Buffer Load
+    foreach_sum = 0;
+    foreach_count = 0;
+    foreach_indices_valid = true;
+    arraydeque_foreach(&deque, accumulate_deque_element);
+    assert(foreach_count == num_operations);
+    assert(foreach_indices_valid == true);
+
+    ArrayDeque copy = arraydeque_copy(&deque);
+    assert(arraydeque_length(&copy) == num_operations);
+
+    // 3. Alternating Pop & PopLeft Drain Test
+    int out;
+    for (int i = 0; i < num_operations / 2; i++) {
+        assert(arraydeque_pop(&deque, &out) == true);
+        assert(arraydeque_popleft(&deque, &out) == true);
+    }
+
+    assert(arraydeque_length(&deque) == 0);
+
+    clock_t end_time = clock();
+    double total_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
+
+    printf("[PERFORMANCE] %d appends + %d pops + 1 copy completed in %.2f ms\n",
+           num_operations, num_operations, total_time_ms);
+
+    arraydeque_free(&deque);
+    arraydeque_free(&copy);
+}
+
+int main(void) {
     test_arraydeque_basic();
     test_arraydeque_stack_and_deque_ops();
     test_arraydeque_stress_and_resize();
     test_arraydeque_generic_types();
     test_arraydeque_copy_and_foreach();
     test_arraydeque_wraparound_resize();
+    
+    // Performance Benchmark
+    test_arraydeque_performance();
 
     puts("All ArrayDeque tests passed.");
     return 0;

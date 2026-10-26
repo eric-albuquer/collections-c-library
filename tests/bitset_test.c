@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <time.h>
+#include <stdlib.h>
 #include "collections.h"
 
 void test_bitset_basic() {
@@ -134,11 +136,58 @@ void test_bitset_new_methods() {
     bitset_free(&bs);
 }
 
+void test_bitset_performance() {
+    const int size = 1000000;          // 1 million bits (~122KB buffer)
+    const int iterations = 5000000;    // 5 million operations
+
+    BitSet a = bitset_create(size);
+    BitSet b = bitset_create(size);
+
+    srand(42);
+
+    clock_t start_time = clock();
+
+    // 1. Batch Bit setting
+    for (int i = 0; i < iterations; i++) {
+        int bit = rand() % size;
+        bitset_set(&a, bit);
+    }
+
+    // 2. Fast Bit Lookup & First/Last search
+    assert(bitset_any(&a) == true);
+    int first_bit = bitset_first(&a);
+    int last_bit = bitset_last(&a);
+    assert(first_bit >= 0 && last_bit >= first_bit);
+
+    // 3. Bitwise logic operations on large bitsets
+    bitset_fill(&b, true);
+    BitSet res_and = bitset_and(&a, &b);
+    BitSet res_xor = bitset_xor(&a, &b);
+
+    // 4. Batch Bit resetting
+    for (int i = 0; i < iterations; i++) {
+        int bit = rand() % size;
+        bitset_reset(&a, bit);
+    }
+
+    clock_t end_time = clock();
+    double total_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
+
+    printf("[PERFORMANCE] %d bit operations + multi-word logic ops completed in %.2f ms\n",
+           iterations * 2, total_time_ms);
+
+    bitset_free(&a);
+    bitset_free(&b);
+    bitset_free(&res_and);
+    bitset_free(&res_xor);
+}
+
 int main() {
     test_bitset_basic();
     test_bitset_fill();
     test_bitset_logic_operations();
     test_bitset_new_methods();
+    test_bitset_performance();
 
     puts("All BitSet tests passed.");
     return 0;

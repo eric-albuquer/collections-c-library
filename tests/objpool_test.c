@@ -19,7 +19,7 @@ void test_objpool_basic(void) {
     assert(pool._capacity == capacity);
     assert(pool._obj_size >= sizeof(Point));
     assert(pool._used == 0);
-    assert(objpool_remaining(&pool) == capacity);
+    assert(objpool_available(&pool) == capacity);
 
     Point* p1 = (Point*)objpool_malloc(&pool);
     Point* p2 = (Point*)objpool_malloc(&pool);
@@ -29,7 +29,7 @@ void test_objpool_basic(void) {
     assert(p2 != NULL);
     assert(p3 != NULL);
     assert(pool._used == 3);
-    assert(objpool_remaining(&pool) == capacity - 3);
+    assert(objpool_available(&pool) == capacity - 3);
 
     p1->x = 10; p1->y = 20;
     p2->x = 30; p2->y = 40;
@@ -41,7 +41,7 @@ void test_objpool_basic(void) {
 
     objpool_free_obj(&pool, p2);
     assert(pool._used == 2);
-    assert(objpool_remaining(&pool) == capacity - 2);
+    assert(objpool_available(&pool) == capacity - 2);
 
     objpool_free(&pool);
 }
@@ -68,7 +68,7 @@ void test_objpool_reuse(void) {
     assert(*c == 300);
     assert(*d == 999);
     assert(pool._used == 3);
-    assert(objpool_remaining(&pool) == 0);
+    assert(objpool_available(&pool) == 0);
 
     objpool_free(&pool);
 }

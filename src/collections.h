@@ -109,6 +109,7 @@ typedef struct ArrayList {
 
 ArrayList arraylist_create(int element_size, int initial_size);
 void arraylist_free(ArrayList* list);
+ArrayList arraylist_copy(const ArrayList* list);
 
 int arraylist_length(const ArrayList* list);
 
@@ -127,7 +128,6 @@ bool arraylist_swap(ArrayList* list, int i, int j);
 
 void arraylist_shuffle(ArrayList* list);
 
-ArrayList arraylist_copy(const ArrayList* list);
 void arraylist_sort(ArrayList* list, int (*cmp)(const void*, const void*));
 int arraylist_bsearch(const ArrayList* list, const void* element,
                       int (*cmp)(const void*, const void*));
@@ -153,14 +153,14 @@ typedef struct ArrayDeque {
 ArrayDeque arraydeque_create(int element_size);
 void arraydeque_free(ArrayDeque* deque);
 
+ArrayDeque arraydeque_copy(const ArrayDeque* deque);
+
 int arraydeque_length(const ArrayDeque* deque);
 
 void arraydeque_append(ArrayDeque* deque, const void* element);
 void arraydeque_appendleft(ArrayDeque* deque, const void* element);
 bool arraydeque_pop(ArrayDeque* deque, void* out);
 bool arraydeque_popleft(ArrayDeque* deque, void* out);
-
-ArrayDeque arraydeque_copy(const ArrayDeque* deque);
 
 void arraydeque_foreach(ArrayDeque* deque, void (*function)(int, void*));
 
@@ -181,12 +181,12 @@ typedef struct Heap {
 Heap heap_create(int element_size, int (*cmp)(const void*, const void*));
 void heap_free(Heap* heap);
 
+Heap heap_copy(const Heap* heap);
+
 int heap_length(const Heap* heap);
 
 void heap_push(Heap* heap, const void* element);
 bool heap_pop(Heap* heap, void* out);
-
-Heap heap_copy(const Heap* heap);
 
 void heap_foreach(const Heap* heap, void (*function)(int, const void*));
 
@@ -217,14 +217,14 @@ HashMap hashmap_create(int key_size, int value_size,
                        uint64_t (*hash)(const void*));
 void hashmap_free(HashMap* map);
 
+HashMap hashmap_copy(const HashMap* map);
+
 int hashmap_length(const HashMap* map);
 
 void hashmap_set(HashMap* map, const void* key, const void* value,
                  void* old_value);
 bool hashmap_get(const HashMap* map, const void* key, void* out);
 bool hashmap_remove(HashMap* map, const void* key, void* out);
-
-HashMap hashmap_copy(const HashMap* map);
 
 void hashmap_keys(const HashMap* map, void (*function)(const void*));
 void hashmap_values(HashMap* map, void (*function)(void*));
@@ -255,13 +255,13 @@ HashSet hashset_create(int element_size,
                        uint64_t (*hash)(const void*));
 void hashset_free(HashSet* set);
 
+HashSet hashset_copy(const HashSet* set);
+
 int hashset_length(const HashSet* set);
 
 void hashset_add(HashSet* set, const void* element);
 bool hashset_has(const HashSet* set, const void* element);
 bool hashset_remove(HashSet* set, const void* element);
-
-HashSet hashset_copy(const HashSet* set);
 
 HashSet hashset_union(const HashSet* a, const HashSet* b);
 HashSet hashset_intersection(const HashSet* a, const HashSet* b);
@@ -280,11 +280,13 @@ typedef struct FrozenHashSet {
 } FrozenHashSet;
 
 FrozenHashSet frozenhashset_create(const HashSet* set);
-void frozenhashset_free(FrozenHashSet* set);
+void frozenhashset_free(FrozenHashSet* f_set);
 
-int frozenhashset_length(const FrozenHashSet* set);
+FrozenHashSet frozenhashset_copy(const FrozenHashSet* f_set);
 
-bool frozenhashset_has(const FrozenHashSet* set, const void* element);
+int frozenhashset_length(const FrozenHashSet* f_set);
+
+bool frozenhashset_has(const FrozenHashSet* f_set, const void* element);
 bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b);
 uint64_t frozenhashset_hash(FrozenHashSet* f_set);
 
@@ -295,7 +297,7 @@ FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a,
 FrozenHashSet frozenhashset_difference(const FrozenHashSet* a,
                                        const FrozenHashSet* b);
 
-void frozenhashset_foreach(const FrozenHashSet* set,
+void frozenhashset_foreach(const FrozenHashSet* f_set,
                            void (*function)(const void*));
 
 // ==========================================================
@@ -317,6 +319,8 @@ typedef struct Trie {
 
 Trie trie_create();
 void trie_free(Trie* trie);
+
+Trie trie_copy(const Trie* trie);
 
 void trie_add_str(Trie* trie, const char* str);
 void trie_add_string(Trie* trie, const String* string);
@@ -345,7 +349,7 @@ typedef struct ObjectPool {
 ObjectPool objpool_create(int max_capacity, int obj_size);
 void objpool_free(ObjectPool* pool);
 
-int objpool_remaining(const ObjectPool* pool);
+int objpool_available(const ObjectPool* pool);
 
 void* objpool_malloc(ObjectPool* pool);
 void objpool_free_obj(ObjectPool* pool, void* obj);
@@ -381,6 +385,9 @@ typedef struct ByteArray {
 
 ByteArray bytearray_create(int initial_capacity);
 void bytearray_free(ByteArray* bytearray);
+
+ByteArray bytearray_copy(const ByteArray* bytearray);
+
 void bytearray_reserve(ByteArray* bytearray, int new_capacity);
 void bytearray_clear(ByteArray* bytearray);
 void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, int size);
@@ -437,6 +444,8 @@ typedef struct IndexedPriorityQueue {
 
 IndexedPriorityQueue indexedpq_create(int element_size, int priority_count);
 void indexedpq_free(IndexedPriorityQueue* ipq);
+
+IndexedPriorityQueue indexedpq_copy(const IndexedPriorityQueue* ipq);
 
 bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* element);
 bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, int* priority_out);

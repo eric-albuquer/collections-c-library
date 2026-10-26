@@ -1452,6 +1452,12 @@ void frozenhashset_free(FrozenHashSet* f_set) {
     hashset_free(&f_set->_set);
 }
 
+FrozenHashSet frozenhashset_copy(const FrozenHashSet* f_set) {
+    FrozenHashSet copy = *f_set;
+    copy._set = hashset_copy(&f_set->_set);
+    return copy;
+}
+
 int frozenhashset_length(const FrozenHashSet* f_set) {
     return f_set->_set._size;
 }
@@ -1527,15 +1533,13 @@ static inline int trie_get_or_create_children(Trie* trie, int parent) {
         trie->_nodes = realloc(trie->_nodes, trie->_capacity * sizeof(TrieNode));
     }
 
+    int children = trie->_used;
+
+    TrieNode default_node = {._parent = parent, ._children = -1, ._is_word = 0};
     for (int i = 0; i < ALPHABET_SIZE; i++){
-        trie->_nodes[trie->_used + i] = (TrieNode) {
-            ._parent = parent,
-            ._is_word = 0,
-            ._children = -1
-        };
+        trie->_nodes[children + i] = default_node;
     }
 
-    int children = trie->_used;
     trie->_nodes[parent]._children = children;
     trie->_used += ALPHABET_SIZE;
     return children;
@@ -1564,6 +1568,13 @@ void trie_free(Trie* trie) {
     trie->_nodes = NULL;
 }
 
+Trie trie_copy(const Trie* trie) {
+    Trie copy = *trie;
+    copy._nodes = malloc(sizeof(TrieNode) * trie->_capacity);
+    memcpy(copy._nodes, trie->_nodes, trie->_used * sizeof(TrieNode));
+    return copy;
+}
+
 void trie_add_str(Trie* trie, const char* str) {
     uint8_t c;
     int node_idx = (uint8_t)(*(str++));
@@ -1590,6 +1601,8 @@ int trie_length(const Trie* trie) {
 bool trie_has_str(const Trie* trie, const char* str) {
     uint8_t c;
     int node_idx = (uint8_t)*(str++);
+    if (node_idx == 0)
+        return 0;
     while((c = *(str++))) {
         if (trie->_nodes[node_idx]._children == -1)
             return 0;
@@ -1605,6 +1618,8 @@ bool trie_has_string(const Trie* trie, const String* string) {
 bool trie_has_prefix_str(const Trie* trie, const char* str) {
     uint8_t c;
     int node_idx = (uint8_t)*(str++);
+    if (node_idx == 0)
+        return 0;
     while((c = *(str++))) {
         if (trie->_nodes[node_idx]._children == -1)
             return 0;
@@ -1643,7 +1658,7 @@ void objpool_free(ObjectPool* pool) {
     pool->_memory = NULL;
 }
 
-int objpool_remaining(const ObjectPool* pool) {
+int objpool_available(const ObjectPool* pool) {
     return pool->_capacity - pool->_used;
 }
 
@@ -1720,6 +1735,13 @@ ByteArray bytearray_create(int initial_capacity) {
 void bytearray_free(ByteArray* bytearray) {
     free(bytearray->_data);
     bytearray->_data = NULL;
+}
+
+ByteArray bytearray_copy(const ByteArray* bytearray){
+    ByteArray copy = *bytearray;
+    copy._data = malloc(bytearray->_capacity);
+    memcpy(copy._data, bytearray->_data, bytearray->_size);
+    return copy;
 }
 
 void bytearray_reserve(ByteArray* bytearray, int new_capacity) {
@@ -1961,6 +1983,15 @@ void indexedpq_free(IndexedPriorityQueue* ipq) {
     ipq->_buckets = NULL;
 
     bitset_free(&ipq->_min_bucket_reference);
+}
+
+IndexedPriorityQueue indexedpq_copy(const IndexedPriorityQueue* ipq) {
+    IndexedPriorityQueue copy = *ipq;
+    copy._min_bucket_reference = bitset_copy(&ipq->_min_bucket_reference);
+    for (int i = 0; i < ipq->_priority_count; i++){
+        copy._buckets[i] = arraydeque_copy(&ipq->_buckets[i]);
+    }
+    return copy;
 }
 
 bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* element) {
