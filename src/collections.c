@@ -59,6 +59,10 @@ bool str_equals(const void* a, const void* b) {
 // HASH GENERIC FUNCTIONS
 // ==========================================================
 
+uint64_t hash_combine(uint64_t seed, uint64_t hash) {
+    return seed ^ (hash + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+}
+
 uint64_t char_hash(const void* value) {
     if (value == NULL) return 0;
     return (uint64_t)(uint8_t)(*(const char*)value);
@@ -281,6 +285,17 @@ void string_free(String* string) {
     string->_memory = NULL;
 }
 
+String string_empty() {
+    String string = {
+        ._capacity = START_CAPACITY,
+        ._hash_computed = 0,
+        ._size = 1,
+        ._memory = malloc(START_CAPACITY),
+    };
+    string._memory[0] = 0;
+    return string;
+}
+
 const char* string_get_str(const String* string) {
     return string->_memory;
 }
@@ -307,6 +322,10 @@ void string_clear(String* string) {
 
 bool string_is_empty(const String* string) {
     return string->_size <= 1;
+}
+
+char string_get_char(const String* string, int idx) {
+    return string->_memory[idx];
 }
 
 String string_trim(const String* string) {
@@ -489,12 +508,12 @@ static inline void arraylist_resize(ArrayList* list){
     list->_memory = realloc(list->_memory, list->_capacity * list->_element_size);
 }
 
-ArrayList arraylist_create(int element_size, int initial_capacity) {
-    initial_capacity = int_max(initial_capacity, START_CAPACITY);
+ArrayList arraylist_create(int element_size, int initial_size) {
+    int initial_capacity = int_max(initial_size, START_CAPACITY);
     ArrayList list = {
         ._capacity = initial_capacity,
         ._element_size = element_size,
-        ._size = 0,
+        ._size = initial_size,
         ._swap_buffer = malloc(element_size),
         ._memory = malloc(initial_capacity * element_size)
     };
@@ -1279,7 +1298,7 @@ int hashset_length(const HashSet* set) {
     return set->_size;
 }
 
-void hashset_add(HashSet* set, const void* element) {
+bool hashset_add(HashSet* set, const void* element) {
     if (set->_size == set->_max_elements)
         hashset_resize(set);
 
@@ -1293,7 +1312,7 @@ void hashset_add(HashSet* set, const void* element) {
         if (set->_states[idx] != HASHTABLE_USED && location == -1) {
             location = idx;
         } else if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + set->_element_size * idx, element)) {
-            return;
+            return 0;
         }
         if (set->_states[idx] == HASHTABLE_EMPTY)
             break;
@@ -1304,6 +1323,7 @@ void hashset_add(HashSet* set, const void* element) {
     set->_hash_cache[location] = hash;
     set->_states[location] = HASHTABLE_USED;
     set->_size++;
+    return 1;
 }
 
 bool hashset_has(const HashSet* set, const void* element) {
@@ -1437,6 +1457,15 @@ static uint64_t hash_element_bytes(const uint8_t* data, size_t size) {
     return hash;
 }
 
+FrozenHashSet frozenhashset_empty(int element_size, bool (*equals)(const void*, const void*), uint64_t (*hash)(const void*)) {
+    FrozenHashSet f_set = {
+        ._checksum_computed = 1,
+        ._checksum = 0,
+        ._set = hashset_create(element_size, equals, hash)
+    };
+    return f_set;
+}
+
 FrozenHashSet frozenhashset_create(const HashSet* set) {
     HashSet copy_set = hashset_copy(set);
     FrozenHashSet f_set = {
@@ -1514,6 +1543,15 @@ FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a, const FrozenHas
 FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashSet* b) {
     HashSet d = hashset_difference(&a->_set, &b->_set);
     return frozenhashset_create(&d);
+}
+
+FrozenHashSet frozenhashset_union_element(const FrozenHashSet* f_set, const void* element) {
+    if (hashset_has(&f_set->_set, element))
+        return *f_set;
+    FrozenHashSet result = frozenhashset_copy(f_set);
+    hashset_add(&result._set, element);
+    result._checksum_computed = 0;
+    return result;
 }
 
 void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const void*)) {

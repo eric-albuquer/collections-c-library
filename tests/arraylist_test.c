@@ -60,7 +60,7 @@ void test_arraylist_creation_and_basic(void) {
 
     ArrayList custom_list = arraylist_create(sizeof(int), 50);
     assert(custom_list._capacity >= 50);
-    assert(arraylist_length(&custom_list) == 0);
+    assert(arraylist_length(&custom_list) == 50);
     arraylist_free(&custom_list);
 
 }

@@ -19,6 +19,8 @@ bool str_equals(const void* a, const void* b);
 // HASH GENERIC FUNCTIONS
 // ==========================================================
 
+uint64_t hash_combine(uint64_t seed, uint64_t hash);
+
 uint64_t int_hash(const void* value);
 uint64_t long_long_hash(const void* value);
 uint64_t float_hash(const void* value);
@@ -69,9 +71,13 @@ String string_create(const char* str);
 void string_free(String* string);
 String string_copy(const String* string);
 
+String string_empty();
+
 const char* string_get_str(const String* string);
 int string_length(const String* string);
 bool string_is_empty(const String* string);
+
+char string_get_char(const String* string, int idx);
 
 void string_append_char(String* string, const char chr);
 void string_extend(String* a, const String* b);
@@ -259,7 +265,7 @@ HashSet hashset_copy(const HashSet* set);
 
 int hashset_length(const HashSet* set);
 
-void hashset_add(HashSet* set, const void* element);
+bool hashset_add(HashSet* set, const void* element);
 bool hashset_has(const HashSet* set, const void* element);
 bool hashset_remove(HashSet* set, const void* element);
 
@@ -279,6 +285,10 @@ typedef struct FrozenHashSet {
     uint64_t _checksum;
 } FrozenHashSet;
 
+FrozenHashSet frozenhashset_empty(int element_size,
+                       bool (*equals)(const void*, const void*),
+                       uint64_t (*hash)(const void*));
+                       
 FrozenHashSet frozenhashset_create(const HashSet* set);
 void frozenhashset_free(FrozenHashSet* f_set);
 
@@ -296,6 +306,8 @@ FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a,
                                          const FrozenHashSet* b);
 FrozenHashSet frozenhashset_difference(const FrozenHashSet* a,
                                        const FrozenHashSet* b);
+
+FrozenHashSet frozenhashset_union_element(const FrozenHashSet* f_set, const void* element);
 
 void frozenhashset_foreach(const FrozenHashSet* f_set,
                            void (*function)(const void*));
