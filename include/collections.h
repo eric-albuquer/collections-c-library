@@ -8,6 +8,8 @@
 // EQUAL GENERIC FUNCTIONS
 // ==========================================================
 
+typedef bool (*equals_fn)(const void*, const void*);
+
 bool int_equals(const void* a, const void* b);
 bool long_long_equals(const void* a, const void* b);
 bool float_equals(const void* a, const void* b);
@@ -21,6 +23,8 @@ bool str_equals(const void* a, const void* b);
 
 uint64_t hash_combine(uint64_t seed, uint64_t hash);
 
+typedef uint64_t (*hash_fn)(const void*);
+
 uint64_t int_hash(const void* value);
 uint64_t long_long_hash(const void* value);
 uint64_t float_hash(const void* value);
@@ -31,6 +35,8 @@ uint64_t str_hash(const void* value);
 // ==========================================================
 // COMPARE GENERIC FUNCTIONS
 // ==========================================================
+
+typedef int (*cmp_fn)(const void*, const void*);
 
 int int_cmp(const void* a, const void* b);
 int long_long_cmp(const void* a, const void* b);
@@ -134,9 +140,8 @@ bool arraylist_swap(ArrayList* list, int i, int j);
 
 void arraylist_shuffle(ArrayList* list);
 
-void arraylist_sort(ArrayList* list, int (*cmp)(const void*, const void*));
-int arraylist_bsearch(const ArrayList* list, const void* element,
-                      int (*cmp)(const void*, const void*));
+void arraylist_sort(ArrayList* list, cmp_fn cmp);
+int arraylist_bsearch(const ArrayList* list, const void* element, cmp_fn cmp);
 void arraylist_foreach(ArrayList* list, void (*function)(int, void*));
 
 // ==========================================================
@@ -178,13 +183,13 @@ typedef struct Heap {
     int _capacity;
     int _element_size;
 
-    int (*_cmp)(const void*, const void*);
+    cmp_fn _cmp;
 
     int _size;
     uint8_t* _memory;
 } Heap;
 
-Heap heap_create(int element_size, int (*cmp)(const void*, const void*));
+Heap heap_create(int element_size, cmp_fn cmp);
 void heap_free(Heap* heap);
 
 Heap heap_copy(const Heap* heap);
@@ -205,8 +210,8 @@ typedef struct HashMap {
     int _mask;
     int _max_elements;
 
-    bool (*_equals)(const void*, const void*);
-    uint64_t (*_hash)(const void*);
+    equals_fn _equals;
+    hash_fn _hash;
 
     int _key_size;
     int _value_size;
@@ -218,17 +223,14 @@ typedef struct HashMap {
     uint8_t* _values;
 } HashMap;
 
-HashMap hashmap_create(int key_size, int value_size,
-                       bool (*equals)(const void*, const void*),
-                       uint64_t (*hash)(const void*));
+HashMap hashmap_create(int key_size, int value_size, equals_fn equals, hash_fn hash);
 void hashmap_free(HashMap* map);
 
 HashMap hashmap_copy(const HashMap* map);
 
 int hashmap_length(const HashMap* map);
 
-void hashmap_set(HashMap* map, const void* key, const void* value,
-                 void* old_value);
+void hashmap_set(HashMap* map, const void* key, const void* value, void* old_value);
 bool hashmap_get(const HashMap* map, const void* key, void* out);
 bool hashmap_remove(HashMap* map, const void* key, void* out);
 
@@ -245,8 +247,8 @@ typedef struct HashSet {
     int _mask;
     int _max_elements;
 
-    bool (*_equals)(const void*, const void*);
-    uint64_t (*_hash)(const void*);
+    equals_fn _equals;
+    hash_fn _hash;
 
     int _element_size;
     int _size;
@@ -256,9 +258,7 @@ typedef struct HashSet {
     uint8_t* _elements;
 } HashSet;
 
-HashSet hashset_create(int element_size,
-                       bool (*equals)(const void*, const void*),
-                       uint64_t (*hash)(const void*));
+HashSet hashset_create(int element_size, equals_fn equals, hash_fn hash);
 void hashset_free(HashSet* set);
 
 HashSet hashset_copy(const HashSet* set);
@@ -285,10 +285,8 @@ typedef struct FrozenHashSet {
     uint64_t _checksum;
 } FrozenHashSet;
 
-FrozenHashSet frozenhashset_empty(int element_size,
-                       bool (*equals)(const void*, const void*),
-                       uint64_t (*hash)(const void*));
-                       
+FrozenHashSet frozenhashset_empty(int element_size, equals_fn equals, hash_fn hash);
+
 FrozenHashSet frozenhashset_create(const HashSet* set);
 void frozenhashset_free(FrozenHashSet* f_set);
 
@@ -300,17 +298,13 @@ bool frozenhashset_has(const FrozenHashSet* f_set, const void* element);
 bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b);
 uint64_t frozenhashset_hash(FrozenHashSet* f_set);
 
-FrozenHashSet frozenhashset_union(const FrozenHashSet* a,
-                                  const FrozenHashSet* b);
-FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a,
-                                         const FrozenHashSet* b);
-FrozenHashSet frozenhashset_difference(const FrozenHashSet* a,
-                                       const FrozenHashSet* b);
+FrozenHashSet frozenhashset_union(const FrozenHashSet* a, const FrozenHashSet* b);
+FrozenHashSet frozenhashset_intersection(const FrozenHashSet* a, const FrozenHashSet* b);
+FrozenHashSet frozenhashset_difference(const FrozenHashSet* a, const FrozenHashSet* b);
 
 FrozenHashSet frozenhashset_union_element(const FrozenHashSet* f_set, const void* element);
 
-void frozenhashset_foreach(const FrozenHashSet* f_set,
-                           void (*function)(const void*));
+void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const void*));
 
 // ==========================================================
 // TRIE

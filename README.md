@@ -51,6 +51,11 @@ gcc -std=c11 -Isrc tests/arraylist_test.c src/collections.c -o run_tests
 ./run_tests
 ```
 
+## Create .a file WINDOWS
+```sh
+gcc -c -O3 src/collections.c -Iinclude -o lib/collections.o && ar rcs lib/libcollections.a lib/collections.o
+```
+
 ### Run every suite on macOS or Linux
 
 ```sh

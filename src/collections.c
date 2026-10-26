@@ -624,7 +624,7 @@ static inline int calc_min_run(int n) {
     return n + r;
 }
 
-static inline void insertion_sort(ArrayList* list, int left, int right, int(*cmp)(const void*, const void*)) {
+static inline void insertion_sort(ArrayList* list, int left, int right, cmp_fn cmp) {
     for (int i = left + 1; i < right + 1; i++){
         memcpy(list->_swap_buffer, list->_memory + i * list->_element_size, list->_element_size);
         int j = i - 1;
@@ -636,7 +636,7 @@ static inline void insertion_sort(ArrayList* list, int left, int right, int(*cmp
     }  
 }
 
-static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, int(*cmp)(const void*, const void*)) {
+static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, cmp_fn cmp) {
     int i = l;
     int j = m;
     int k = l;
@@ -665,7 +665,7 @@ static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, int
     }
 }
 
-void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
+void arraylist_sort(ArrayList* list, cmp_fn cmp) {
     int n = list->_size;
     if (n < 2)
         return;
@@ -702,7 +702,7 @@ void arraylist_sort(ArrayList* list, int(*cmp)(const void*, const void*)) {
     //qsort(list->_memory, list->_size, list->_element_size, cmp);
 }
 
-int arraylist_bsearch(const ArrayList* list, const void* element, int(*cmp)(const void*, const void*)) {
+int arraylist_bsearch(const ArrayList* list, const void* element, cmp_fn cmp) {
     void* idx = bsearch(element, list->_memory, list->_size, list->_element_size, cmp);
     if (idx == NULL) return -1;
     return (((uint8_t*)idx) - list->_memory) / list->_element_size;
@@ -874,7 +874,7 @@ static inline void heap_resize(Heap* heap) {
     heap->_memory = realloc(heap->_memory, heap->_capacity * heap->_element_size);
 }
 
-Heap heap_create(int element_size, int (*cmp)(const void*, const void*)) {
+Heap heap_create(int element_size, cmp_fn cmp) {
     Heap heap = {
         ._capacity = START_CAPACITY,
         ._element_size = element_size,
@@ -1064,8 +1064,8 @@ static inline void hashmap_resize(HashMap* map) {
 HashMap hashmap_create(
     int key_size,
     int value_size,
-    bool (*equals)(const void*, const void*),
-    uint64_t (*hash)(const void*)
+    equals_fn equals,
+    hash_fn hash
 ) {
     HashMap map = {
         ._capacity = START_CAPACITY,
@@ -1266,8 +1266,8 @@ static inline void hashset_resize(HashSet* set) {
 
 HashSet hashset_create(
     int element_size,
-    bool (*equals)(const void*, const void*),
-    uint64_t (*hash)(const void*)
+    equals_fn equals,
+    hash_fn hash
 ) {
     HashSet set = {
         ._capacity = START_CAPACITY,
@@ -1457,7 +1457,7 @@ static uint64_t hash_element_bytes(const uint8_t* data, size_t size) {
     return hash;
 }
 
-FrozenHashSet frozenhashset_empty(int element_size, bool (*equals)(const void*, const void*), uint64_t (*hash)(const void*)) {
+FrozenHashSet frozenhashset_empty(int element_size, equals_fn equals, hash_fn hash) {
     FrozenHashSet f_set = {
         ._checksum_computed = 1,
         ._checksum = 0,
