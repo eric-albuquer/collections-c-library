@@ -6,7 +6,7 @@ The library has no third-party dependencies and uses only the C standard library
 
 ## Features
 
-- **String**: owned, growable strings with copying, concatenation, trimming, substring, case conversion, searching, comparison, hashing, and character iteration.
+- **String**: owned, growable strings with a 32-byte inline buffer for short values and heap storage for longer strings, plus copying, concatenation, trimming, substring, case conversion, searching, comparison, hashing, and character iteration.
 - **ArrayList**: resizable indexed storage with append/pop, positional get/set/insert/remove, swapping, shuffling, copying, sorting, binary search, and iteration.
 - **ArrayDeque**: resizable circular double-ended queue with append/pop operations on both ends, copying, and iteration.
 - **Heap**: generic binary priority queue with caller-defined ordering, copying, and iteration.

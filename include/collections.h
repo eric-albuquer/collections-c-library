@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define STRING_LOCAL_CAPACITY 32
+
 // ==========================================================
 // EQUAL GENERIC FUNCTIONS
 // ==========================================================
@@ -70,15 +72,19 @@ typedef struct String {
     size_t _size;
     uint64_t _hash;
     bool _hash_computed;
+    bool _is_local;
 
-    char* _memory;
+    union {
+        char _local[STRING_LOCAL_CAPACITY];
+        char* _memory;
+    } _data;
 } String;
 
 String string_create(const char* str);
 void string_free(String* string);
 String string_copy(const String* string);
 
-String string_empty();
+String string_empty(void);
 
 const char* string_get_str(const String* string);
 size_t string_length(const String* string);
@@ -105,7 +111,7 @@ int string_compare(const String* a, const String* b);
 bool string_equals(const String* a, const String* b);
 uint64_t string_hash(String* string);
 
-void string_foreach(const String* string, void (*function)(size_t, char*));
+void string_foreach(String* string, void (*function)(size_t, char*));
 
 // ==========================================================
 // ARRAY LIST
@@ -421,6 +427,8 @@ size_t bytearray_available(const ByteArray* bytearray);
 
 typedef struct BitSet {
     size_t _size;
+    uint64_t _hash;
+    bool _hash_computed;
     uint64_t* _data;
 } BitSet;
 
@@ -431,6 +439,8 @@ BitSet bitset_copy(const BitSet* bitset);
 
 void bitset_clear(BitSet* bitset);
 void bitset_fill(BitSet* bitset, bool value);
+
+uint64_t bistet_hash(BitSet* bitset);
 
 size_t bitset_count(const BitSet* bitset);
 

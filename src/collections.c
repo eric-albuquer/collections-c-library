@@ -257,53 +257,76 @@ char char_max(char a, char b) {
 // STRING
 // ==========================================================
 
-static inline void string_resize(String* s) {
-    s->_capacity <<= 1;
-    s->_memory = realloc(s->_memory, s->_capacity);
+static void string_reserve(String* string, size_t required_capacity) {
+    if (required_capacity <= string->_capacity)
+        return;
+
+    size_t capacity = string->_capacity;
+    while (capacity < required_capacity) {
+        capacity = capacity > SIZE_MAX / 2 ? required_capacity : capacity * 2;
+    }
+
+    if (string->_is_local) {
+        char* memory = malloc(capacity);
+        if (memory == NULL)
+            abort();
+        memcpy(memory, string->_data._local, string->_size);
+        string->_data._memory = memory;
+        string->_is_local = false;
+    } else {
+        char* memory = realloc(string->_data._memory, capacity);
+        if (memory == NULL)
+            abort();
+        string->_data._memory = memory;
+    }
+    string->_capacity = capacity;
 }
 
+static inline char* string_get_str_modify(String* string);
+
 String string_create(const char* str) {
-    String string = {
-        ._capacity = START_CAPACITY,
-        ._hash_computed = 0,
-        ._size = 0,
-        ._memory = malloc(START_CAPACITY),
-    };
+    String string = string_empty();
+    if (str == NULL || str[0] == '\0')
+        return string;
 
-    size_t idx = 0;
-    char c;
-    do {
-        if (idx == string._capacity)
-            string_resize(&string);
-
-        c = str[idx];
-        string._memory[idx] = c;
-        idx++;
-    } while (c != 0);
-    string._size = idx;
-
+    size_t length = strlen(str);
+    string_reserve(&string, length + 1);
+    memcpy(string_get_str_modify(&string), str, length + 1);
+    string._size = length + 1;
+    string._hash_computed = false;
     return string;
 }
 
 void string_free(String* string) {
-    free(string->_memory);
-    string->_memory = NULL;
+    if (!string->_is_local)
+        free(string->_data._memory);
+
+    string->_capacity = STRING_LOCAL_CAPACITY;
+    string->_size = 1;
+    string->_hash = 0;
+    string->_hash_computed = false;
+    string->_is_local = true;
+    string->_data._local[0] = '\0';
 }
 
-String string_empty() {
+String string_empty(void) {
     String string = {
-        ._capacity = START_CAPACITY,
-        ._hash_computed = 1,
+        ._capacity = STRING_LOCAL_CAPACITY,
         ._hash = 0,
+        ._hash_computed = false,
         ._size = 1,
-        ._memory = malloc(START_CAPACITY),
+        ._is_local = true
     };
-    string._memory[0] = 0;
+    string._data._local[0] = '\0';
     return string;
 }
 
 const char* string_get_str(const String* string) {
-    return string->_memory;
+    return string->_is_local ? string->_data._local : string->_data._memory;
+}
+
+static inline char* string_get_str_modify(String* string) {
+    return string->_is_local ? string->_data._local : string->_data._memory;
 }
 
 size_t string_length(const String* string) {
@@ -311,13 +334,12 @@ size_t string_length(const String* string) {
 }
 
 void string_append_char(String* string, const char chr) {
-    string->_hash_computed = false;
-    if (string->_size == string->_capacity)
-        string_resize(string);
-    
-    string->_memory[string->_size - 1] = chr;
-    string->_memory[string->_size] = 0;
+    string_reserve(string, string->_size + 1);
+    char* ptr = string_get_str_modify(string);
+    ptr[string->_size - 1] = chr;
+    ptr[string->_size] = '\0';
     string->_size++;
+    string->_hash_computed = false;
 }
 
 bool string_is_empty(const String* string) {
@@ -325,115 +347,119 @@ bool string_is_empty(const String* string) {
 }
 
 char string_get_char(const String* string, size_t idx) {
-    return string->_memory[idx];
+    if (idx >= string_length(string))
+        return '\0';
+    return string_get_str(string)[idx];
 }
 
 String string_trim(const String* string) {
     size_t left = 0;
     size_t right = string_length(string);
+    const char* source = string_get_str(string);
 
-    while (left < right && string->_memory[left] == ' ')
+    while (left < right && source[left] == ' ')
         left++;
-    while (right > left && string->_memory[right - 1] == ' ')
+    while (right > left && source[right - 1] == ' ')
         right--;
 
-    size_t size = right - left;
-    String result = {
-        ._capacity = size + 1,
-        ._hash_computed = 0,
-        ._size = size + 1,
-        ._memory = malloc(size + 1)
-    };
-
-    memcpy(result._memory, string->_memory + left, size);
-    result._memory[size] = 0;
+    size_t length = right - left;
+    String result = string_empty();
+    string_reserve(&result, length + 1);
+    memcpy(string_get_str_modify(&result), source + left, length);
+    string_get_str_modify(&result)[length] = '\0';
+    result._size = length + 1;
+    result._hash_computed = false;
     return result;
 }
 
 String string_substring(const String* string, size_t start, size_t length) {
-    String result = {
-        ._capacity = length + 1,
-        ._hash_computed = 0,
-        ._size = length + 1,
-        ._memory = malloc(length + 1)
-    };
+    size_t source_length = string_length(string);
+    if (start >= source_length)
+        return string_empty();
+    if (length > source_length - start)
+        length = source_length - start;
 
-    memcpy(result._memory, string->_memory + start, length);
-    result._memory[length] = 0;
+    String result = string_empty();
+    string_reserve(&result, length + 1);
+    memcpy(string_get_str_modify(&result), string_get_str(string) + start, length);
+    string_get_str_modify(&result)[length] = '\0';
+    result._size = length + 1;
+    result._hash_computed = false;
     return result;
 }
 
 void string_to_lower(String* string) {
     static const int lower_offset = 'a' - 'A';
-    for (size_t i = 0; i < string->_size - 1; i++){
-        if (string->_memory[i] >= 'A' && string->_memory[i] <= 'Z')
-            string->_memory[i] += lower_offset;
+    char* ptr = string_get_str_modify(string);
+    for (size_t i = 0; i < string_length(string); i++) {
+        if (ptr[i] >= 'A' && ptr[i] <= 'Z')
+            ptr[i] += lower_offset;
     }
+    string->_hash_computed = false;
 }
 
 void string_to_upper(String* string) {
     static const int upper_offset = 'A' - 'a';
-    for (size_t i = 0; i < string->_size - 1; i++){
-        if (string->_memory[i] >= 'a' && string->_memory[i] <= 'z')
-            string->_memory[i] += upper_offset;
+    char* ptr = string_get_str_modify(string);
+    for (size_t i = 0; i < string_length(string); i++) {
+        if (ptr[i] >= 'a' && ptr[i] <= 'z')
+            ptr[i] += upper_offset;
     }
+    string->_hash_computed = false;
 }
 
 bool string_starts_with(const String* string, const char* prefix) {
-    char c;
-    size_t idx = 0;
-    while ((c = *(prefix++))){
-        if (idx >= string_length(string) || string->_memory[idx] != c)
-            return 0;
-        idx++;
-    }
-    return 1;
+    size_t prefix_length = strlen(prefix);
+    return prefix_length <= string_length(string) &&
+           memcmp(string_get_str(string), prefix, prefix_length) == 0;
 }
 
 bool string_ends_with(const String* string, const char* suffix) {
-    size_t length = strlen(suffix);
-    size_t string_size = string_length(string);
-    if (length > string_size)
-        return false;
-    size_t idx = string_size - length;
-    for (size_t i = 0; i < length; i++){
-        if (string->_memory[idx + i] != suffix[i])
-            return 0;
-    }
-    return 1;
+    size_t suffix_length = strlen(suffix);
+    size_t length = string_length(string);
+    return suffix_length <= length &&
+           memcmp(string_get_str(string) + length - suffix_length,
+                  suffix, suffix_length) == 0;
 }
 
 String string_copy(const String* string) {
-    String copy = {
-        ._capacity = string->_capacity,
-        ._hash_computed = string->_hash_computed,
-        ._hash = string->_hash,
-        ._size = string->_size,
-        ._memory = malloc(string->_capacity)
-    };
-    memcpy(copy._memory, string->_memory, string->_size);
-        
+    String copy = string_empty();
+    string_reserve(&copy, string->_size);
+    memcpy(string_get_str_modify(&copy), string_get_str(string), string->_size);
+    copy._size = string->_size;
+    copy._hash = string->_hash;
+    copy._hash_computed = string->_hash_computed;
     return copy;
 }
 
 void string_clear(String* string) {
-    string->_hash_computed = 1;
-    string->_hash = 0;
+    if (!string->_is_local)
+        free(string->_data._memory);
+
+    string->_capacity = STRING_LOCAL_CAPACITY;
     string->_size = 1;
-    string->_memory[0] = 0;
+    string->_hash = 0;
+    string->_hash_computed = false;
+    string->_is_local = true;
+    string->_data._local[0] = '\0';
 }
 
 int string_compare(const String* a, const String* b) {
-    return strcmp(a->_memory, b->_memory);
+    return strcmp(string_get_str(a), string_get_str(b));
 }
 
 void string_extend(String* a, const String* b) {
+    size_t original_length = string_length(a);
+    size_t append_length = string_length(b);
+    if (append_length == 0)
+        return;
+
+    string_reserve(a, original_length + append_length + 1);
+    memmove(string_get_str_modify(a) + original_length,
+            string_get_str(b), append_length);
+    a->_size = original_length + append_length + 1;
+    string_get_str_modify(a)[a->_size - 1] = '\0';
     a->_hash_computed = false;
-    const size_t idx = a->_size - 1;
-    a->_size += b->_size - 1;
-    while(a->_size > a->_capacity)
-        string_resize(a);
-    memcpy(a->_memory + idx, b->_memory, b->_size);
 }
 
 static inline void build_shift_table(const char* pattern, size_t m, size_t* bad_char) {
@@ -455,14 +481,18 @@ int string_index_of(const String* a, const String* b) {
     if (n < m) return -1;   
 
     size_t bad_char[ALPHABET_SIZE];
-    build_shift_table(b->_memory, m, bad_char);
+
+    const char* a_ptr = string_get_str(a);
+    const char* b_ptr = string_get_str(b);
+
+    build_shift_table(b_ptr, m, bad_char);
 
     size_t i = 0;
 
     while (i <= n - m) {
         size_t j = m;
 
-        while (j > 0 && b->_memory[j - 1] == a->_memory[i + j - 1]) {
+        while (j > 0 && b_ptr[j - 1] == a_ptr[i + j - 1]) {
             j--;
         }
 
@@ -470,7 +500,7 @@ int string_index_of(const String* a, const String* b) {
             return i <= INT_MAX ? (int)i : -1;
         }
 
-        uint8_t mismatched_char = (uint8_t)a->_memory[i + m - 1];
+        uint8_t mismatched_char = (uint8_t)a_ptr[i + m - 1];
         i += bad_char[mismatched_char];
     }
 
@@ -484,13 +514,13 @@ bool string_contains(const String* a, const String* b) {
 bool string_equals(const String* a, const String* b) {
     if (a->_hash_computed && b->_hash_computed && a->_hash != b->_hash)
         return 0;
-    return str_equals(a->_memory, b->_memory);
+    return str_equals(string_get_str(a), string_get_str(b));
 }
 
 uint64_t string_hash(String* string) {
     if (string->_hash_computed)
         return string->_hash;
-    string->_hash = str_hash(string->_memory);
+    string->_hash = str_hash(string_get_str(string));
     string->_hash_computed = 1;
     return string->_hash;
 }
@@ -501,10 +531,12 @@ String string_concatenate(const String* a, const String* b) {
     return res;
 }
 
-void string_foreach(const String* string, void (*function)(size_t, char*)) {
+void string_foreach(String* string, void (*function)(size_t, char*)) {
+    char* ptr = string_get_str_modify(string);
     for (size_t i = 0; i < string->_size - 1; i++){
-        function(i, string->_memory + i);  
+        function(i, ptr + i);
     }
+    string->_hash_computed = false;
 }
 
 // ==========================================================
@@ -1708,7 +1740,7 @@ void trie_add_str(Trie* trie, const char* str) {
 }
 
 void trie_add_string(Trie* trie, const String* string) {
-    trie_add_str(trie, string->_memory);
+    trie_add_str(trie, string_get_str(string));
 }
 
 size_t trie_length(const Trie* trie) {
@@ -1729,7 +1761,7 @@ bool trie_has_str(const Trie* trie, const char* str) {
 }
 
 bool trie_has_string(const Trie* trie, const String* string) {
-    return trie_has_str(trie, string->_memory);
+    return trie_has_str(trie, string_get_str(string));
 }
 
 bool trie_has_prefix_str(const Trie* trie, const char* str) {
@@ -1746,7 +1778,7 @@ bool trie_has_prefix_str(const Trie* trie, const char* str) {
 }
 
 bool trie_has_prefix_string(const Trie* trie, const String* string) {
-    return trie_has_prefix_str(trie, string->_memory);
+    return trie_has_prefix_str(trie, string_get_str(string));
 }
 
 // ==========================================================
@@ -1911,6 +1943,8 @@ BitSet bitset_create(size_t size) {
     size = (size + (size_t)BITSET_MASK) & ~(size_t)BITSET_MASK;
     BitSet bitset = {
         ._size = size,
+        ._hash_computed = 1,
+        ._hash = 0,
         ._data = calloc(size, 1)
     };
 
@@ -1925,6 +1959,8 @@ void bitset_free(BitSet* bitset) {
 BitSet bitset_copy(const BitSet* bitset) {
     BitSet copy = {
         ._size = bitset->_size,
+        ._hash_computed = bitset->_hash_computed,
+        ._hash = bitset->_hash,
         ._data = malloc(bitset->_size)
     };
 
@@ -1933,11 +1969,26 @@ BitSet bitset_copy(const BitSet* bitset) {
 }
 
 void bitset_clear(BitSet* bitset) {
+    bitset->_hash = 0;
+    bitset->_hash_computed = 1;
     memset(bitset->_data, 0, bitset->_size);
 }
 
 void bitset_fill(BitSet* bitset, bool value) {
+    bitset->_hash_computed = 0;
     memset(bitset->_data, 0xff * value, bitset->_size);
+}
+
+uint64_t bistet_hash(BitSet* bitset) {
+    if (bitset->_hash_computed)
+        return bitset->_hash;
+    uint64_t hash = 0;
+    for (size_t i = 0; i < bitset->_size >> BITSET_SHIFT; i++){
+        hash_combine(hash, mix_bits(bitset->_data[i]));
+    }
+    bitset->_hash = hash;
+    bitset->_hash_computed = 1;
+    return hash;
 }
 
 #if defined(_MSC_VER)
@@ -1965,6 +2016,7 @@ size_t bitset_count(const BitSet* bitset) {
 }
 
 void bitset_set(BitSet* bitset, size_t bit) {
+    bitset->_hash_computed = 0;
     const size_t idx = bit >> BITSET_SHIFT;
     bitset->_data[idx] |= (1ULL << (bit & BITSET_MASK));
 }
@@ -1975,17 +2027,20 @@ bool bitset_get(const BitSet* bitset, size_t bit) {
 }
 
 void bitset_flip(BitSet* bitset, size_t bit) {
+    bitset->_hash_computed = 0;
     const size_t idx = bit >> BITSET_SHIFT;
     bitset->_data[idx] ^= (1ULL << (bit & BITSET_MASK));
 }
 
 void bitset_reset(BitSet* bitset, size_t bit) {
+    bitset->_hash_computed = 0;
     const size_t idx = bit >> BITSET_SHIFT;
     bitset->_data[idx] &= ~(1ULL << (bit & BITSET_MASK));
 }
 
 BitSet bitset_and(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
+    result._hash_computed = 0;
     for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] &= b->_data[i];
     return result;
@@ -1993,6 +2048,7 @@ BitSet bitset_and(const BitSet* a, const BitSet* b) {
 
 BitSet bitset_or(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
+    result._hash_computed = 0;
     for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] |= b->_data[i];
     return result;
@@ -2000,6 +2056,7 @@ BitSet bitset_or(const BitSet* a, const BitSet* b) {
 
 BitSet bitset_xor(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
+    result._hash_computed = 0;
     for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] ^= b->_data[i];
     return result;
@@ -2008,7 +2065,8 @@ BitSet bitset_xor(const BitSet* a, const BitSet* b) {
 BitSet bitset_not(const BitSet* a) {
     BitSet result = {
         ._size = a->_size,
-        ._data = malloc(a->_size)
+        ._hash_computed = 0,
+        ._data = malloc(a->_size),
     };
 
     for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
