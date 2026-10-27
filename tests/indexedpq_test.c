@@ -11,7 +11,7 @@ void test_indexedpq_create_and_free() {
     assert(indexedpq_length(&ipq) == 0);
 
     int out_val = 0;
-    int out_prio = -1;
+    size_t out_prio = SIZE_MAX;
     assert(indexedpq_dequeue(&ipq, &out_val, &out_prio) == false);
 
     indexedpq_free(&ipq);
@@ -30,7 +30,7 @@ void test_indexedpq_order_by_priority() {
     assert(indexedpq_length(&ipq) == 4);
 
     int out_val = 0;
-    int out_prio = -1;
+    size_t out_prio = SIZE_MAX;
 
     assert(indexedpq_dequeue(&ipq, &out_val, &out_prio) == true);
     assert(out_prio == 0 && out_val == 200);
@@ -62,7 +62,7 @@ void test_indexedpq_fifo_same_priority() {
     assert(indexedpq_length(&ipq) == 3);
 
     int out_val = 0;
-    int out_prio = -1;
+    size_t out_prio = SIZE_MAX;
 
     assert(indexedpq_dequeue(&ipq, &out_val, &out_prio) == true);
     assert(out_prio == 2 && out_val == 10);
@@ -81,7 +81,7 @@ void test_indexedpq_bounds_and_null_out() {
 
     int val = 42;
 
-    assert(indexedpq_enqueue(&ipq, -1, &val) == false);
+    assert(indexedpq_enqueue(&ipq, SIZE_MAX, &val) == false);
     assert(indexedpq_enqueue(&ipq, 4, &val) == false);
     assert(indexedpq_length(&ipq) == 0);
 
@@ -93,8 +93,8 @@ void test_indexedpq_bounds_and_null_out() {
 }
 
 void test_indexedpq_performance() {
-    const int num_operations = 1000000;
-    const int priority_count = 64;     
+    const size_t num_operations = 1000000;
+    const size_t priority_count = 64;
 
     IndexedPriorityQueue ipq = indexedpq_create(sizeof(int), priority_count);
 
@@ -102,18 +102,19 @@ void test_indexedpq_performance() {
 
     clock_t start_time = clock();
 
-    for (int i = 0; i < num_operations; i++) {
-        int priority = rand() % priority_count;
-        assert(indexedpq_enqueue(&ipq, priority, &i) == true);
+    for (size_t i = 0; i < num_operations; i++) {
+        size_t priority = (size_t)rand() % priority_count;
+        int value = (int)i;
+        assert(indexedpq_enqueue(&ipq, priority, &value) == true);
     }
 
     assert(indexedpq_length(&ipq) == num_operations);
 
     int out_val;
-    int out_prio;
-    int last_prio = -1;
+    size_t out_prio;
+    size_t last_prio = 0;
 
-    for (int i = 0; i < num_operations; i++) {
+    for (size_t i = 0; i < num_operations; i++) {
         assert(indexedpq_dequeue(&ipq, &out_val, &out_prio) == true);
         
         assert(out_prio >= last_prio);
@@ -125,8 +126,9 @@ void test_indexedpq_performance() {
     clock_t end_time = clock();
     double total_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
 
-    printf("IndexedPriorityQueue %d insertions + %d dequeues completed in %.2f ms (%.2f ops/ms)\n",
-           num_operations, num_operations, total_time_ms, (num_operations * 2) / total_time_ms);
+    printf("IndexedPriorityQueue %zu insertions + %zu dequeues completed in %.2f ms (%.2f ops/ms)\n",
+           num_operations, num_operations, total_time_ms,
+           (double)(num_operations * 2) / total_time_ms);
 
     indexedpq_free(&ipq);
 }

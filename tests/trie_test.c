@@ -107,32 +107,27 @@ void test_trie_copy() {
 }
 
 void test_trie_performance() {
-    const int num_words = 100000;
-    const int word_len = 10;
+    const size_t num_words = 100000;
+    const size_t word_len = 10;
 
     Trie trie = trie_create();
     char** words = (char**)malloc(num_words * sizeof(char*));
 
-    srand(42); // Fixed seed for reproducible benchmarks
-
-    // Generate random lower-case strings
-    for (int i = 0; i < num_words; i++) {
+    for (size_t i = 0; i < num_words; i++) {
         words[i] = (char*)malloc((word_len + 1) * sizeof(char));
-        for (int j = 0; j < word_len; j++) {
-            words[i][j] = 'a' + (rand() % 26);
-        }
-        words[i][word_len] = '\0';
+        assert(words[i] != NULL);
+        assert(snprintf(words[i], word_len + 1, "word%06zu", i) == (int)word_len);
     }
 
     clock_t start_time = clock();
 
     // 1. Batch Insertion Test
-    for (int i = 0; i < num_words; i++) {
+    for (size_t i = 0; i < num_words; i++) {
         trie_add_str(&trie, words[i]);
     }
 
     // 2. Batch Lookup Test
-    for (int i = 0; i < num_words; i++) {
+    for (size_t i = 0; i < num_words; i++) {
         assert(trie_has_str(&trie, words[i]) == true);
     }
 
@@ -143,11 +138,11 @@ void test_trie_performance() {
     clock_t end_time = clock();
     double total_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
 
-    printf("[PERFORMANCE] %d insertions + %d lookups + 1 copy completed in %.2f ms\n",
+    printf("[PERFORMANCE] %zu insertions + %zu lookups + 1 copy completed in %.2f ms\n",
            num_words, num_words, total_time_ms);
 
     // Cleanup
-    for (int i = 0; i < num_words; i++) {
+    for (size_t i = 0; i < num_words; i++) {
         free(words[i]);
     }
     free(words);

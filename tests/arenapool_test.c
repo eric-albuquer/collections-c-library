@@ -9,7 +9,7 @@
 
 
 void test_arenapool_creation_and_lifecycle(void) {
-    int initial_capacity = 1024;
+    size_t initial_capacity = 1024;
     ArenaPool arena = arenapool_create(initial_capacity);
 
     assert(arena._capacity == initial_capacity);
@@ -34,7 +34,7 @@ void test_arenapool_sequential_allocations(void) {
     assert(ptr1 != NULL);
     assert(arena._used >= 100);
 
-    int remaining_space_1 = arenapool_available(&arena);
+    size_t remaining_space_1 = arenapool_available(&arena);
     assert(remaining_space_1 <= 412);
 
     void* ptr2 = arenapool_malloc(&arena, 50);
@@ -57,7 +57,7 @@ void test_arenapool_out_of_memory(void) {
 
     assert(arena._used == 32);
     assert(arena._used <= 64);
-    assert(arenapool_available(&arena) >= 0);
+    assert(arenapool_available(&arena) <= arena._capacity);
 
     arenapool_free(&arena);
 }
@@ -104,11 +104,11 @@ void test_arenapool_performance_and_stress(void) {
 
     clock_t start = clock();
 
-    int iterations = 10000;
-    int block_size = 8;
+    size_t iterations = 10000;
+    size_t block_size = 8;
     ArenaPool arena = arenapool_create(iterations * block_size * 2);
 
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         void* ptr = arenapool_malloc(&arena, block_size);
         assert(ptr != NULL);
     }
@@ -119,7 +119,7 @@ void test_arenapool_performance_and_stress(void) {
 
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("ArenaPool benchmark: %d allocations in %.6f seconds.\n",
+    printf("ArenaPool benchmark: %zu allocations in %.6f seconds.\n",
            iterations, total_time);
 
 }

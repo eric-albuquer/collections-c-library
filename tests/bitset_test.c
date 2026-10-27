@@ -137,8 +137,8 @@ void test_bitset_new_methods() {
 }
 
 void test_bitset_performance() {
-    const int size = 1000000;          // 1 million bits (~122KB buffer)
-    const int iterations = 5000000;    // 5 million operations
+    const size_t size = 1000000;
+    const size_t iterations = 5000000;
 
     BitSet a = bitset_create(size);
     BitSet b = bitset_create(size);
@@ -148,8 +148,8 @@ void test_bitset_performance() {
     clock_t start_time = clock();
 
     // 1. Batch Bit setting
-    for (int i = 0; i < iterations; i++) {
-        int bit = rand() % size;
+    for (size_t i = 0; i < iterations; i++) {
+        size_t bit = (size_t)rand() % size;
         bitset_set(&a, bit);
     }
 
@@ -165,15 +165,15 @@ void test_bitset_performance() {
     BitSet res_xor = bitset_xor(&a, &b);
 
     // 4. Batch Bit resetting
-    for (int i = 0; i < iterations; i++) {
-        int bit = rand() % size;
+    for (size_t i = 0; i < iterations; i++) {
+        size_t bit = (size_t)rand() % size;
         bitset_reset(&a, bit);
     }
 
     clock_t end_time = clock();
     double total_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
 
-    printf("[PERFORMANCE] %d bit operations + multi-word logic ops completed in %.2f ms\n",
+    printf("[PERFORMANCE] %zu bit operations + multi-word logic ops completed in %.2f ms\n",
            iterations * 2, total_time_ms);
 
     bitset_free(&a);

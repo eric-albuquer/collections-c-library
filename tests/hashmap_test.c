@@ -13,7 +13,7 @@ typedef struct User {
 } User;
 
 static int enumerated_sum;
-static int enumerated_count;
+static size_t enumerated_count;
 static bool enumerated_items_valid;
 
 static void accumulate_key(const void* key) {
@@ -168,52 +168,58 @@ void test_hashmap_struct_keys(void) {
 void test_hashmap_stress_and_rehash(void) {
 
     HashMap map = hashmap_create(sizeof(int), sizeof(int), int_equals, int_hash);
-    int total = 10000;
+    size_t total = 10000;
 
     clock_t start = clock();
 
-    for (int i = 0; i < total; i++) {
-        int val = i * 2;
-        hashmap_set(&map, &i, &val, NULL);
+    for (size_t i = 0; i < total; i++) {
+        int key = (int)i;
+        int val = key * 2;
+        hashmap_set(&map, &key, &val, NULL);
     }
 
     assert(hashmap_length(&map) == total);
 
-    for (int i = 0; i < total; i++) {
+    for (size_t i = 0; i < total; i++) {
+        int key = (int)i;
         int out = 0;
-        assert(hashmap_get(&map, &i, &out) == true);
-        assert(out == i * 2);
+        assert(hashmap_get(&map, &key, &out) == true);
+        assert(out == key * 2);
     }
 
-    for (int i = 0; i < total / 2; i++) {
+    for (size_t i = 0; i < total / 2; i++) {
+        int key = (int)i;
         int out = 0;
-        assert(hashmap_remove(&map, &i, &out) == true);
-        assert(out == i * 2);
-        assert(hashmap_get(&map, &i, &out) == false);
+        assert(hashmap_remove(&map, &key, &out) == true);
+        assert(out == key * 2);
+        assert(hashmap_get(&map, &key, &out) == false);
     }
 
     assert(hashmap_length(&map) == total / 2);
-    for (int i = 0; i < total / 2; i++) {
-        int value = -i;
-        hashmap_set(&map, &i, &value, NULL);
+    for (size_t i = 0; i < total / 2; i++) {
+        int key = (int)i;
+        int value = -key;
+        hashmap_set(&map, &key, &value, NULL);
     }
     assert(hashmap_length(&map) == total);
-    for (int i = total / 2; i < total; i++) {
+    for (size_t i = total / 2; i < total; i++) {
+        int key = (int)i;
         int out = 0;
-        assert(hashmap_get(&map, &i, &out) == true);
-        assert(out == i * 2);
+        assert(hashmap_get(&map, &key, &out) == true);
+        assert(out == key * 2);
     }
-    for (int i = 0; i < total / 2; i++) {
+    for (size_t i = 0; i < total / 2; i++) {
+        int key = (int)i;
         int out = 0;
-        assert(hashmap_get(&map, &i, &out) == true);
-        assert(out == -i);
+        assert(hashmap_get(&map, &key, &out) == true);
+        assert(out == -key);
     }
 
     hashmap_free(&map);
 
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("HashMap benchmark: %d keys inserted and queried in %.6f seconds.\n",
+    printf("HashMap benchmark: %zu keys inserted and queried in %.6f seconds.\n",
            total, total_time);
 
 }

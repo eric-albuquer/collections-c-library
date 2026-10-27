@@ -4,10 +4,10 @@
 #include <time.h>
 #include "collections.h"
 
-static int foreach_count;
+static size_t foreach_count;
 static bool foreach_matches_text;
 
-static void dummy_callback(int index, char* chr) {
+static void dummy_callback(size_t index, char* chr) {
     static const char expected[] = "Apple";
     if (index != foreach_count || *chr != expected[foreach_count]) {
         foreach_matches_text = false;
@@ -111,20 +111,20 @@ void test_string_performance() {
 
     clock_t start, end;
     double cpu_time_used;
-    const int iterations = 50000;
+    const size_t iterations = 50000;
 
     start = clock();
     String s = string_create("");
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         string_append_char(&s, 'x');
     }
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
     start = clock();
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         String copy = string_copy(&s);
-        volatile int len = string_length(&copy);
+        volatile size_t len = string_length(&copy);
         (void)len;
         string_free(&copy);
     }
@@ -133,7 +133,7 @@ void test_string_performance() {
 
     String target = string_create("   High Performance C Code Optimization Routine   ");
     start = clock();
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         String trimmed = string_trim(&target);
         String sub = string_substring(&trimmed, 5, 11);
         string_to_upper(&sub);
@@ -148,7 +148,7 @@ void test_string_performance() {
     String haystack = string_create("The quick brown fox jumps over the lazy dog and repeats the pattern continuously.");
     String needle = string_create("lazy dog");
     start = clock();
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         volatile bool found = string_contains(&haystack, &needle);
         volatile int idx = string_index_of(&haystack, &needle);
         (void)found;
@@ -160,7 +160,7 @@ void test_string_performance() {
     string_free(&needle);
 
     start = clock();
-    for (int i = 0; i < iterations; i++) {
+    for (size_t i = 0; i < iterations; i++) {
         volatile uint64_t h = string_hash(&s);
         (void)h;
     }
@@ -168,7 +168,7 @@ void test_string_performance() {
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
     string_free(&s);
-    printf("String benchmark: %d iterations per workload; final workload took %.6f seconds.\n",
+    printf("String benchmark: %zu iterations per workload; final workload took %.6f seconds.\n",
            iterations, cpu_time_used);
 
 }

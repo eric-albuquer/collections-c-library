@@ -2,6 +2,7 @@
 #define COLLECTIONS_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // ==========================================================
@@ -65,8 +66,8 @@ char char_max(char a, char b);
 // ==========================================================
 
 typedef struct String {
-    int _capacity;
-    int _size;
+    size_t _capacity;
+    size_t _size;
     uint64_t _hash;
     bool _hash_computed;
 
@@ -80,17 +81,17 @@ String string_copy(const String* string);
 String string_empty();
 
 const char* string_get_str(const String* string);
-int string_length(const String* string);
+size_t string_length(const String* string);
 bool string_is_empty(const String* string);
 
-char string_get_char(const String* string, int idx);
+char string_get_char(const String* string, size_t idx);
 
 void string_append_char(String* string, const char chr);
 void string_extend(String* a, const String* b);
 void string_clear(String* string);
 
 String string_trim(const String* string);
-String string_substring(const String* string, int start, int length);
+String string_substring(const String* string, size_t start, size_t length);
 String string_concatenate(const String* a, const String* b);
 void string_to_lower(String* string);
 void string_to_upper(String* string);
@@ -104,118 +105,127 @@ int string_compare(const String* a, const String* b);
 bool string_equals(const String* a, const String* b);
 uint64_t string_hash(String* string);
 
-void string_foreach(const String* string, void (*function)(int, char*));
+void string_foreach(const String* string, void (*function)(size_t, char*));
 
 // ==========================================================
 // ARRAY LIST
 // ==========================================================
 
 typedef struct ArrayList {
-    int _capacity;
-    int _element_size;
-    int _size;
+    size_t _capacity;
+    size_t _element_size;
+    size_t _size;
 
     uint8_t* _swap_buffer;
     uint8_t* _memory;
 } ArrayList;
 
-ArrayList arraylist_create(int element_size, int initial_size);
+ArrayList arraylist_create(size_t element_size, size_t initial_size);
 void arraylist_free(ArrayList* list);
 ArrayList arraylist_copy(const ArrayList* list);
 
-int arraylist_length(const ArrayList* list);
-
-bool arraylist_get(const ArrayList* list, int idx, void* out);
-bool arraylist_set(ArrayList* list, int idx, const void* element);
-
-bool arraylist_insert_index(ArrayList* list, int idx, const void* element);
-bool arraylist_remove_index(ArrayList* list, int idx, void* out);
-
 void arraylist_clear(ArrayList* list);
+
+size_t arraylist_length(const ArrayList* list);
+
+bool arraylist_get(const ArrayList* list, size_t idx, void* out);
+bool arraylist_set(ArrayList* list, size_t idx, const void* element);
+
+bool arraylist_insert_index(ArrayList* list, size_t idx, const void* element);
+bool arraylist_remove_index(ArrayList* list, size_t idx, void* out);
 
 void arraylist_append(ArrayList* list, const void* element);
 bool arraylist_pop(ArrayList* list, void* out);
 
-bool arraylist_swap(ArrayList* list, int i, int j);
+bool arraylist_swap(ArrayList* list, size_t i, size_t j);
 
 void arraylist_shuffle(ArrayList* list);
 
 void arraylist_sort(ArrayList* list, cmp_fn cmp);
 int arraylist_bsearch(const ArrayList* list, const void* element, cmp_fn cmp);
-void arraylist_foreach(ArrayList* list, void (*function)(int, void*));
+void arraylist_foreach(ArrayList* list, void (*function)(size_t, void*));
 
 // ==========================================================
 // ARRAY DEQUE
 // ==========================================================
 
 typedef struct ArrayDeque {
-    int _capacity;
-    int _mask;
+    size_t _capacity;
+    size_t _mask;
 
-    int _element_size;
-    int _size;
+    size_t _element_size;
+    size_t _size;
 
-    int _head;
-    int _tail;
+    size_t _head;
+    size_t _tail;
 
     uint8_t* _memory;
 } ArrayDeque;
 
-ArrayDeque arraydeque_create(int element_size);
+ArrayDeque arraydeque_create(size_t element_size);
 void arraydeque_free(ArrayDeque* deque);
 
 ArrayDeque arraydeque_copy(const ArrayDeque* deque);
+void arraydeque_clear(ArrayDeque* deque);
 
-int arraydeque_length(const ArrayDeque* deque);
+size_t arraydeque_length(const ArrayDeque* deque);
+
+bool arraydeque_get(const ArrayDeque* deque, size_t idx, void* out);
+
+bool arraydeque_peek(const ArrayDeque* deque, void* out);
+bool arraydeque_peekleft(const ArrayDeque* deque, void* out);
 
 void arraydeque_append(ArrayDeque* deque, const void* element);
 void arraydeque_appendleft(ArrayDeque* deque, const void* element);
 bool arraydeque_pop(ArrayDeque* deque, void* out);
 bool arraydeque_popleft(ArrayDeque* deque, void* out);
 
-void arraydeque_foreach(ArrayDeque* deque, void (*function)(int, void*));
+void arraydeque_foreach(ArrayDeque* deque, void (*function)(size_t, void*));
 
 // ==========================================================
 // HEAP
 // ==========================================================
 
 typedef struct Heap {
-    int _capacity;
-    int _element_size;
+    size_t _capacity;
+    size_t _element_size;
 
     cmp_fn _cmp;
 
-    int _size;
+    size_t _size;
     uint8_t* _memory;
 } Heap;
 
-Heap heap_create(int element_size, cmp_fn cmp);
+Heap heap_create(size_t element_size, cmp_fn cmp);
 void heap_free(Heap* heap);
 
 Heap heap_copy(const Heap* heap);
+void heap_clear(Heap* heap);
 
-int heap_length(const Heap* heap);
+size_t heap_length(const Heap* heap);
 
 void heap_push(Heap* heap, const void* element);
 bool heap_pop(Heap* heap, void* out);
 
-void heap_foreach(const Heap* heap, void (*function)(int, const void*));
+bool heap_peek(Heap* heap, void* out);
+
+void heap_foreach(const Heap* heap, void (*function)(size_t, const void*));
 
 // ==========================================================
 // HASH MAP
 // ==========================================================
 
 typedef struct HashMap {
-    int _capacity;
-    int _mask;
-    int _max_elements;
+    size_t _capacity;
+    size_t _mask;
+    size_t _max_elements;
 
     equals_fn _equals;
     hash_fn _hash;
 
-    int _key_size;
-    int _value_size;
-    int _size;
+    size_t _key_size;
+    size_t _value_size;
+    size_t _size;
 
     uint8_t* _states;
     uint64_t* _hash_cache;
@@ -223,12 +233,13 @@ typedef struct HashMap {
     uint8_t* _values;
 } HashMap;
 
-HashMap hashmap_create(int key_size, int value_size, equals_fn equals, hash_fn hash);
+HashMap hashmap_create(size_t key_size, size_t value_size, equals_fn equals, hash_fn hash);
 void hashmap_free(HashMap* map);
 
 HashMap hashmap_copy(const HashMap* map);
+void hashmap_clear(HashMap* map);
 
-int hashmap_length(const HashMap* map);
+size_t hashmap_length(const HashMap* map);
 
 void hashmap_set(HashMap* map, const void* key, const void* value, void* old_value);
 bool hashmap_get(const HashMap* map, const void* key, void* out);
@@ -243,27 +254,28 @@ void hashmap_items(HashMap* map, void (*function)(const void*, void*));
 // ==========================================================
 
 typedef struct HashSet {
-    int _capacity;
-    int _mask;
-    int _max_elements;
+    size_t _capacity;
+    size_t _mask;
+    size_t _max_elements;
 
     equals_fn _equals;
     hash_fn _hash;
 
-    int _element_size;
-    int _size;
+    size_t _element_size;
+    size_t _size;
 
     uint8_t* _states;
     uint64_t* _hash_cache;
     uint8_t* _elements;
 } HashSet;
 
-HashSet hashset_create(int element_size, equals_fn equals, hash_fn hash);
+HashSet hashset_create(size_t element_size, equals_fn equals, hash_fn hash);
 void hashset_free(HashSet* set);
 
 HashSet hashset_copy(const HashSet* set);
+void hashset_clear(HashSet* set);
 
-int hashset_length(const HashSet* set);
+size_t hashset_length(const HashSet* set);
 
 bool hashset_add(HashSet* set, const void* element);
 bool hashset_has(const HashSet* set, const void* element);
@@ -285,14 +297,14 @@ typedef struct FrozenHashSet {
     uint64_t _checksum;
 } FrozenHashSet;
 
-FrozenHashSet frozenhashset_empty(int element_size, equals_fn equals, hash_fn hash);
+FrozenHashSet frozenhashset_empty(size_t element_size, equals_fn equals, hash_fn hash);
 
 FrozenHashSet frozenhashset_create(const HashSet* set);
 void frozenhashset_free(FrozenHashSet* f_set);
 
 FrozenHashSet frozenhashset_copy(const FrozenHashSet* f_set);
 
-int frozenhashset_length(const FrozenHashSet* f_set);
+size_t frozenhashset_length(const FrozenHashSet* f_set);
 
 bool frozenhashset_has(const FrozenHashSet* f_set, const void* element);
 bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b);
@@ -312,14 +324,14 @@ void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const vo
 
 typedef struct TrieNode {
     unsigned _is_word : 1;
-    int _parent;
-    int _children;
+    size_t _parent;
+    size_t _children;
 } TrieNode;
 
 typedef struct Trie {
-    int _capacity;
-    int _used;
-    int _size;
+    size_t _capacity;
+    size_t _used;
+    size_t _size;
     TrieNode* _nodes;  // root = 0
 } Trie;
 
@@ -327,11 +339,12 @@ Trie trie_create();
 void trie_free(Trie* trie);
 
 Trie trie_copy(const Trie* trie);
+void trie_clear(Trie* trie);
 
 void trie_add_str(Trie* trie, const char* str);
 void trie_add_string(Trie* trie, const String* string);
 
-int trie_length(const Trie* trie);
+size_t trie_length(const Trie* trie);
 
 bool trie_has_str(const Trie* trie, const char* str);
 bool trie_has_string(const Trie* trie, const String* string);
@@ -344,18 +357,18 @@ bool trie_has_prefix_string(const Trie* trie, const String* string);
 // ==========================================================
 
 typedef struct ObjectPool {
-    int _capacity;
-    int _obj_size;
-    int _used;
+    size_t _capacity;
+    size_t _obj_size;
+    size_t _used;
 
-    int _head;
+    size_t _head;
     uint8_t* _memory;
 } ObjectPool;
 
-ObjectPool objpool_create(int max_capacity, int obj_size);
+ObjectPool objpool_create(size_t max_capacity, size_t obj_size);
 void objpool_free(ObjectPool* pool);
 
-int objpool_available(const ObjectPool* pool);
+size_t objpool_available(const ObjectPool* pool);
 
 void* objpool_malloc(ObjectPool* pool);
 void objpool_free_obj(ObjectPool* pool, void* obj);
@@ -365,53 +378,53 @@ void objpool_free_obj(ObjectPool* pool, void* obj);
 // ==========================================================
 
 typedef struct ArenaPool {
-    int _capacity;
-    int _used;
+    size_t _capacity;
+    size_t _used;
 
     uint8_t* _memory;
 } ArenaPool;
 
-ArenaPool arenapool_create(int total_bytes);
+ArenaPool arenapool_create(size_t total_bytes);
 void arenapool_free(ArenaPool* arena);
 
-int arenapool_available(ArenaPool* arena);
+size_t arenapool_available(const ArenaPool* arena);
 
-void* arenapool_malloc(ArenaPool* arena, int byte_count);
+void* arenapool_malloc(ArenaPool* arena, size_t byte_count);
 
 // ==========================================================
 // BYTE ARRAY
 // ==========================================================
 
 typedef struct ByteArray {
-    int _capacity;
-    int _size;
-    int _cursor;
+    size_t _capacity;
+    size_t _size;
+    size_t _cursor;
     uint8_t* _data;
 } ByteArray;
 
-ByteArray bytearray_create(int initial_capacity);
+ByteArray bytearray_create(size_t initial_capacity);
 void bytearray_free(ByteArray* bytearray);
 
 ByteArray bytearray_copy(const ByteArray* bytearray);
-
-void bytearray_reserve(ByteArray* bytearray, int new_capacity);
 void bytearray_clear(ByteArray* bytearray);
-void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, int size);
-int bytearray_read_bytes(ByteArray* bytearray, void* out, int size);
 
-bool bytearray_seek(ByteArray* bytearray, int offset);
-int bytearray_available(const ByteArray* bytearray);
+void bytearray_reserve(ByteArray* bytearray, size_t new_capacity);
+void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, size_t size);
+size_t bytearray_read_bytes(ByteArray* bytearray, void* out, size_t size);
+
+bool bytearray_seek(ByteArray* bytearray, size_t offset);
+size_t bytearray_available(const ByteArray* bytearray);
 
 // ==========================================================
 // BIT SET
 // ==========================================================
 
 typedef struct BitSet {
-    int _size;
+    size_t _size;
     uint64_t* _data;
 } BitSet;
 
-BitSet bitset_create(int size);
+BitSet bitset_create(size_t size);
 void bitset_free(BitSet* bitset);
 
 BitSet bitset_copy(const BitSet* bitset);
@@ -419,10 +432,12 @@ BitSet bitset_copy(const BitSet* bitset);
 void bitset_clear(BitSet* bitset);
 void bitset_fill(BitSet* bitset, bool value);
 
-void bitset_set(BitSet* bitset, int bit);
-bool bitset_get(const BitSet* bitset, int bit);
-void bitset_flip(BitSet* bitset, int bit);
-void bitset_reset(BitSet* bitset, int bit);
+size_t bitset_count(const BitSet* bitset);
+
+void bitset_set(BitSet* bitset, size_t bit);
+bool bitset_get(const BitSet* bitset, size_t bit);
+void bitset_flip(BitSet* bitset, size_t bit);
+void bitset_reset(BitSet* bitset, size_t bit);
 
 BitSet bitset_and(const BitSet* a, const BitSet* b);
 BitSet bitset_or(const BitSet* a, const BitSet* b);
@@ -441,21 +456,24 @@ int bitset_last(const BitSet* bitset);
 // ==========================================================
 
 typedef struct IndexedPriorityQueue {
-    int _element_size;
-    int _size;
-    int _priority_count;
+    size_t _element_size;
+    size_t _size;
+    size_t _priority_count;
     BitSet _min_bucket_reference;
     ArrayDeque* _buckets;
 } IndexedPriorityQueue;
 
-IndexedPriorityQueue indexedpq_create(int element_size, int priority_count);
+IndexedPriorityQueue indexedpq_create(size_t element_size, size_t priority_count);
 void indexedpq_free(IndexedPriorityQueue* ipq);
 
 IndexedPriorityQueue indexedpq_copy(const IndexedPriorityQueue* ipq);
+void indexedpq_clear(IndexedPriorityQueue* ipq);
 
-bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* element);
-bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, int* priority_out);
+bool indexedpq_enqueue(IndexedPriorityQueue* ipq, size_t priority, const void* element);
+bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, size_t* priority_out);
 
-int indexedpq_length(const IndexedPriorityQueue* ipq);
+bool indexedpq_peek(IndexedPriorityQueue* ipq, void* out, size_t* priority_out);
+
+size_t indexedpq_length(const IndexedPriorityQueue* ipq);
 
 #endif

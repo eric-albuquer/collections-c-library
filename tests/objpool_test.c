@@ -14,7 +14,7 @@ typedef struct Point {
 
 
 void test_objpool_basic(void) {
-    int capacity = 5;
+    size_t capacity = 5;
     ObjectPool pool = objpool_create(capacity, sizeof(Point));
     assert(pool._capacity == capacity);
     assert(pool._obj_size >= sizeof(Point));
@@ -98,26 +98,26 @@ void test_objpool_capacity_limits(void) {
 
 void test_objpool_stress_and_performance(void) {
 
-    int capacity = 50000;
+    size_t capacity = 50000;
     ObjectPool pool = objpool_create(capacity, sizeof(int));
 
     clock_t start = clock();
 
     int** ptrs = (int**)malloc(capacity * sizeof(int*));
     assert(ptrs != NULL);
-    for (int i = 0; i < capacity; i++) {
+    for (size_t i = 0; i < capacity; i++) {
         ptrs[i] = (int*)objpool_malloc(&pool);
         assert(ptrs[i] != NULL);
-        *ptrs[i] = i;
+        *ptrs[i] = (int)i;
     }
     assert(pool._used == capacity);
 
-    for (int i = 0; i < capacity; i++) {
+    for (size_t i = 0; i < capacity; i++) {
         objpool_free_obj(&pool, ptrs[i]);
     }
     assert(pool._used == 0);
 
-    for (int i = 0; i < capacity; i++) {
+    for (size_t i = 0; i < capacity; i++) {
         ptrs[i] = (int*)objpool_malloc(&pool);
         assert(ptrs[i] != NULL);
     }
@@ -128,7 +128,7 @@ void test_objpool_stress_and_performance(void) {
 
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("ObjectPool benchmark: %d allocation/free operations in %.6f seconds.\n",
+    printf("ObjectPool benchmark: %zu allocation/free operations in %.6f seconds.\n",
            capacity * 2, total_time);
 
 }

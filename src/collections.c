@@ -1,4 +1,5 @@
 #include "collections.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,7 +8,6 @@
 #define START_TRIE_CAPACITY 1024
 #define ALPHABET_SIZE 256
 
-#define HASHMAP_FACTOR 0.75f
 #define HASHTABLE_EMPTY 0
 #define HASHTABLE_REMOVED 1
 #define HASHTABLE_USED 2
@@ -15,6 +15,11 @@
 #define BISTET_WORD 64
 #define BITSET_MASK 63
 #define BITSET_SHIFT 6
+#define TRIE_NO_NODE SIZE_MAX
+
+#if defined(_MSC_VER)
+    #include <intrin.h>
+#endif
 
 // ==========================================================
 // EQUAL GENERIC FUNCTIONS
@@ -265,7 +270,7 @@ String string_create(const char* str) {
         ._memory = malloc(START_CAPACITY),
     };
 
-    int idx = 0;
+    size_t idx = 0;
     char c;
     do {
         if (idx == string._capacity)
@@ -288,7 +293,8 @@ void string_free(String* string) {
 String string_empty() {
     String string = {
         ._capacity = START_CAPACITY,
-        ._hash_computed = 0,
+        ._hash_computed = 1,
+        ._hash = 0,
         ._size = 1,
         ._memory = malloc(START_CAPACITY),
     };
@@ -300,7 +306,7 @@ const char* string_get_str(const String* string) {
     return string->_memory;
 }
 
-int string_length(const String* string) {
+size_t string_length(const String* string) {
     return string->_size - 1;
 }
 
@@ -314,36 +320,29 @@ void string_append_char(String* string, const char chr) {
     string->_size++;
 }
 
-void string_clear(String* string) {
-    string->_hash_computed = false;
-    string->_memory[0] = 0;
-    string->_size = 1;
-}
-
 bool string_is_empty(const String* string) {
     return string->_size <= 1;
 }
 
-char string_get_char(const String* string, int idx) {
+char string_get_char(const String* string, size_t idx) {
     return string->_memory[idx];
 }
 
 String string_trim(const String* string) {
-    int left = 0;
-    int right = string->_size - 2;
+    size_t left = 0;
+    size_t right = string_length(string);
 
-    while(string->_memory[left] == ' ')
+    while (left < right && string->_memory[left] == ' ')
         left++;
-
-    while(string->_memory[right] == ' ')
+    while (right > left && string->_memory[right - 1] == ' ')
         right--;
 
-    int size = right - left + 1;
+    size_t size = right - left;
     String result = {
-        ._capacity = size,
+        ._capacity = size + 1,
         ._hash_computed = 0,
-        ._size = size,
-        ._memory = malloc(size)
+        ._size = size + 1,
+        ._memory = malloc(size + 1)
     };
 
     memcpy(result._memory, string->_memory + left, size);
@@ -351,7 +350,7 @@ String string_trim(const String* string) {
     return result;
 }
 
-String string_substring(const String* string, int start, int length) {
+String string_substring(const String* string, size_t start, size_t length) {
     String result = {
         ._capacity = length + 1,
         ._hash_computed = 0,
@@ -366,7 +365,7 @@ String string_substring(const String* string, int start, int length) {
 
 void string_to_lower(String* string) {
     static const int lower_offset = 'a' - 'A';
-    for (int i = 0; i < string->_size - 1; i++){
+    for (size_t i = 0; i < string->_size - 1; i++){
         if (string->_memory[i] >= 'A' && string->_memory[i] <= 'Z')
             string->_memory[i] += lower_offset;
     }
@@ -374,7 +373,7 @@ void string_to_lower(String* string) {
 
 void string_to_upper(String* string) {
     static const int upper_offset = 'A' - 'a';
-    for (int i = 0; i < string->_size - 1; i++){
+    for (size_t i = 0; i < string->_size - 1; i++){
         if (string->_memory[i] >= 'a' && string->_memory[i] <= 'z')
             string->_memory[i] += upper_offset;
     }
@@ -382,9 +381,9 @@ void string_to_upper(String* string) {
 
 bool string_starts_with(const String* string, const char* prefix) {
     char c;
-    int idx = 0;
+    size_t idx = 0;
     while ((c = *(prefix++))){
-        if (string->_memory[idx] != c)
+        if (idx >= string_length(string) || string->_memory[idx] != c)
             return 0;
         idx++;
     }
@@ -392,12 +391,14 @@ bool string_starts_with(const String* string, const char* prefix) {
 }
 
 bool string_ends_with(const String* string, const char* suffix) {
-    int length = strlen(suffix);
-    int idx = string->_size - 2;
-    for (int i = length - 1; i >= 0; i--){
-        if (string->_memory[idx] != suffix[i])
+    size_t length = strlen(suffix);
+    size_t string_size = string_length(string);
+    if (length > string_size)
+        return false;
+    size_t idx = string_size - length;
+    for (size_t i = 0; i < length; i++){
+        if (string->_memory[idx + i] != suffix[i])
             return 0;
-        idx--;
     }
     return 1;
 }
@@ -415,51 +416,58 @@ String string_copy(const String* string) {
     return copy;
 }
 
+void string_clear(String* string) {
+    string->_hash_computed = 1;
+    string->_hash = 0;
+    string->_size = 1;
+    string->_memory[0] = 0;
+}
+
 int string_compare(const String* a, const String* b) {
     return strcmp(a->_memory, b->_memory);
 }
 
 void string_extend(String* a, const String* b) {
     a->_hash_computed = false;
-    const int idx = a->_size - 1;
+    const size_t idx = a->_size - 1;
     a->_size += b->_size - 1;
     while(a->_size > a->_capacity)
         string_resize(a);
     memcpy(a->_memory + idx, b->_memory, b->_size);
 }
 
-static inline void build_shift_table(const char* pattern, int m, int* bad_char) {
-    for (int i = 0; i < ALPHABET_SIZE; i++) {
+static inline void build_shift_table(const char* pattern, size_t m, size_t* bad_char) {
+    for (size_t i = 0; i < ALPHABET_SIZE; i++) {
         bad_char[i] = m;
     }
 
-    for (int i = 0; i < m - 1; i++) {
+    for (size_t i = 0; i + 1 < m; i++) {
         uint8_t c = (uint8_t)pattern[i];
         bad_char[c] = m - 1 - i;
     }
 }
 
 int string_index_of(const String* a, const String* b) {
-    int n = a->_size - 1;
-    int m = b->_size - 1;
+    size_t n = string_length(a);
+    size_t m = string_length(b);
 
     if (m == 0) return 0; 
     if (n < m) return -1;   
 
-    int bad_char[ALPHABET_SIZE];
+    size_t bad_char[ALPHABET_SIZE];
     build_shift_table(b->_memory, m, bad_char);
 
-    int i = 0;
+    size_t i = 0;
 
     while (i <= n - m) {
-        int j = m - 1; 
+        size_t j = m;
 
-        while (j >= 0 && b->_memory[j] == a->_memory[i + j]) {
+        while (j > 0 && b->_memory[j - 1] == a->_memory[i + j - 1]) {
             j--;
         }
 
-        if (j < 0) {
-            return i;
+        if (j == 0) {
+            return i <= INT_MAX ? (int)i : -1;
         }
 
         uint8_t mismatched_char = (uint8_t)a->_memory[i + m - 1];
@@ -493,8 +501,8 @@ String string_concatenate(const String* a, const String* b) {
     return res;
 }
 
-void string_foreach(const String* string, void (*function)(int, char*)) {
-    for (int i = 0; i < string->_size - 1; i++){
+void string_foreach(const String* string, void (*function)(size_t, char*)) {
+    for (size_t i = 0; i < string->_size - 1; i++){
         function(i, string->_memory + i);  
     }
 }
@@ -508,8 +516,8 @@ static inline void arraylist_resize(ArrayList* list){
     list->_memory = realloc(list->_memory, list->_capacity * list->_element_size);
 }
 
-ArrayList arraylist_create(int element_size, int initial_size) {
-    int initial_capacity = int_max(initial_size, START_CAPACITY);
+ArrayList arraylist_create(size_t element_size, size_t initial_size) {
+    size_t initial_capacity = initial_size > START_CAPACITY ? initial_size : START_CAPACITY;
     ArrayList list = {
         ._capacity = initial_capacity,
         ._element_size = element_size,
@@ -528,32 +536,32 @@ void arraylist_free(ArrayList* list) {
     list->_memory = NULL;
 }
 
-int arraylist_length(const ArrayList* list) {
+size_t arraylist_length(const ArrayList* list) {
     return list->_size;
 }
 
-bool arraylist_get(const ArrayList* list, int idx, void* out) {
-    if ((unsigned int)idx >= list->_size)
+bool arraylist_get(const ArrayList* list, size_t idx, void* out) {
+    if (idx >= list->_size)
         return 0;
     memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
     return 1;
 }
 
-bool arraylist_set(ArrayList* list, int idx, const void* element) {
-    if ((unsigned int)idx >= list->_size)
+bool arraylist_set(ArrayList* list, size_t idx, const void* element) {
+    if (idx >= list->_size)
         return 0;
     memcpy(list->_memory + idx * list->_element_size, element, list->_element_size);
     return 1;
 }
 
-bool arraylist_insert_index(ArrayList* list, int idx, const void* element) {
-    if ((unsigned int)idx > list->_size)
+bool arraylist_insert_index(ArrayList* list, size_t idx, const void* element) {
+    if (idx > list->_size)
         return 0;
 
     if (list->_size == list->_capacity)
         arraylist_resize(list);
 
-    for (int i = list->_size; i > idx; i--){
+    for (size_t i = list->_size; i > idx; i--){
         memcpy(list->_memory + i * list->_element_size, list->_memory + (i - 1) * list->_element_size, list->_element_size);
     }
 
@@ -562,15 +570,15 @@ bool arraylist_insert_index(ArrayList* list, int idx, const void* element) {
     return 1;
 }
 
-bool arraylist_remove_index(ArrayList* list, int idx, void* out) {
-    if((unsigned int)idx >= list->_size)
+bool arraylist_remove_index(ArrayList* list, size_t idx, void* out) {
+    if(idx >= list->_size)
         return 0;
 
     if (out)
         memcpy(out, list->_memory + idx * list->_element_size, list->_element_size);
     list->_size--;
 
-    for (int i = idx; i < list->_size; i++){
+    for (size_t i = idx; i < list->_size; i++){
         memcpy(list->_memory + i * list->_element_size, list->_memory + (i + 1) * list->_element_size, list->_element_size);
     }
     
@@ -599,8 +607,8 @@ bool arraylist_pop(ArrayList* list, void* out) {
     return 1;
 }
 
-bool arraylist_swap(ArrayList* list, int i, int j) {
-    if ((unsigned int)i >= list->_size || (unsigned int)j >= list->_size || i == j)
+bool arraylist_swap(ArrayList* list, size_t i, size_t j) {
+    if (i >= list->_size || j >= list->_size || i == j)
         return 0;
     memcpy(list->_swap_buffer, list->_memory + i * list->_element_size, list->_element_size);
     memcpy(list->_memory + i * list->_element_size, list->_memory + j * list->_element_size, list->_element_size);
@@ -609,14 +617,14 @@ bool arraylist_swap(ArrayList* list, int i, int j) {
 }
 
 void arraylist_shuffle(ArrayList* list) {
-    for (int i = list->_size - 1; i > 0; i--){
-        int idx = rand() % (i + 1);
+    for (size_t i = list->_size; i > 1; i--){
+        size_t idx = (size_t)rand() % i;
         arraylist_swap(list, i, idx);
     }
 }
 
-static inline int calc_min_run(int n) {
-    int r = 0;
+static inline size_t calc_min_run(size_t n) {
+    size_t r = 0;
     while(n >= 64) {
         r |= n & 1;
         n >>= 1;
@@ -624,22 +632,22 @@ static inline int calc_min_run(int n) {
     return n + r;
 }
 
-static inline void insertion_sort(ArrayList* list, int left, int right, cmp_fn cmp) {
-    for (int i = left + 1; i < right + 1; i++){
+static inline void insertion_sort(ArrayList* list, size_t left, size_t right, cmp_fn cmp) {
+    for (size_t i = left + 1; i < right; i++){
         memcpy(list->_swap_buffer, list->_memory + i * list->_element_size, list->_element_size);
-        int j = i - 1;
-        while (j >= left && cmp(list->_memory + j * list->_element_size, list->_swap_buffer) > 0) {
-            memcpy(list->_memory + (j + 1) * list->_element_size, list->_memory + j * list->_element_size, list->_element_size);
+        size_t j = i;
+        while (j > left && cmp(list->_memory + (j - 1) * list->_element_size, list->_swap_buffer) > 0) {
+            memcpy(list->_memory + j * list->_element_size, list->_memory + (j - 1) * list->_element_size, list->_element_size);
             j--;
         }
-        memcpy(list->_memory + (j + 1) * list->_element_size, list->_swap_buffer, list->_element_size);
+        memcpy(list->_memory + j * list->_element_size, list->_swap_buffer, list->_element_size);
     }  
 }
 
-static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, cmp_fn cmp) {
-    int i = l;
-    int j = m;
-    int k = l;
+static inline void merge(ArrayList* list, uint8_t* aux, size_t l, size_t m, size_t r, cmp_fn cmp) {
+    size_t i = l;
+    size_t j = m;
+    size_t k = l;
 
     while (i < m && j < r) {
         if (cmp(aux + i * list->_element_size, aux + j * list->_element_size) <= 0) {
@@ -666,15 +674,16 @@ static inline void merge(ArrayList* list, uint8_t* aux, int l, int m, int r, cmp
 }
 
 void arraylist_sort(ArrayList* list, cmp_fn cmp) {
-    int n = list->_size;
+    size_t n = list->_size;
     if (n < 2)
         return;
 
-    int min_run = calc_min_run(n);
+    size_t min_run = calc_min_run(n);
 
-    for (int i = 0; i < n; i += min_run){
-        int end = int_min(i + min_run - 1, n - 1);
+    for (size_t i = 0; i < n;){
+        size_t end = n - i < min_run ? n : i + min_run;
         insertion_sort(list, i, end, cmp);
+        i = end;
     }
 
     if (min_run == n)
@@ -682,19 +691,22 @@ void arraylist_sort(ArrayList* list, cmp_fn cmp) {
 
     uint8_t* aux = malloc(list->_element_size * list->_size);
     
-    int size = min_run;
+    size_t size = min_run;
     while (size < n) {
-        const int double_size = size * 2;
+        const size_t double_size = size > n - size ? n : size * 2;
         uint8_t* temp = list->_memory;
         list->_memory = aux;
         aux = temp;
-        for (int i = 0; i < n; i += double_size){
-            int mid = int_min(i + size, n);
-            int end = int_min(i + double_size, n);
+        for (size_t i = 0; i < n;){
+            size_t mid = n - i < size ? n : i + size;
+            size_t end = n - i < double_size ? n : i + double_size;
 
             if (i < end)
                 merge(list, aux, i, mid, end, cmp);
+            i = end;
         }
+        if (double_size == n)
+            break;
         size = double_size;
     }
 
@@ -705,7 +717,8 @@ void arraylist_sort(ArrayList* list, cmp_fn cmp) {
 int arraylist_bsearch(const ArrayList* list, const void* element, cmp_fn cmp) {
     void* idx = bsearch(element, list->_memory, list->_size, list->_element_size, cmp);
     if (idx == NULL) return -1;
-    return (((uint8_t*)idx) - list->_memory) / list->_element_size;
+    size_t index = (size_t)((uint8_t*)idx - list->_memory) / list->_element_size;
+    return index <= INT_MAX ? (int)index : -1;
 }
 
 ArrayList arraylist_copy(const ArrayList* list) {
@@ -721,8 +734,8 @@ ArrayList arraylist_copy(const ArrayList* list) {
     return copy;
 }
 
-void arraylist_foreach(ArrayList* list, void(*function)(int, void*)) {
-    for (int i = 0; i < list->_size; i++){
+void arraylist_foreach(ArrayList* list, void(*function)(size_t, void*)) {
+    for (size_t i = 0; i < list->_size; i++){
         function(i, list->_memory + i * list->_element_size);   
     }
 }
@@ -755,7 +768,7 @@ static inline void arraydeque_resize(ArrayDeque* deque) {
     deque->_tail = deque->_size;
 }
 
-ArrayDeque arraydeque_create(int element_size) {
+ArrayDeque arraydeque_create(size_t element_size) {
     ArrayDeque deque = {
         ._capacity = START_CAPACITY,
         ._mask = START_CAPACITY - 1,
@@ -776,8 +789,31 @@ void arraydeque_free(ArrayDeque* deque) {
     deque->_memory = NULL;
 }
 
-int arraydeque_length(const ArrayDeque* deque) {
+size_t arraydeque_length(const ArrayDeque* deque) {
     return deque->_size;
+}
+
+bool arraydeque_get(const ArrayDeque* deque, size_t idx, void* out) {
+    if (idx >= deque->_size)
+        return 0;
+    size_t d_idx = (deque->_head + idx) & deque->_mask;
+    memcpy(out, deque->_memory + d_idx * deque->_element_size, deque->_element_size);
+    return 1;
+}
+
+bool arraydeque_peek(const ArrayDeque* deque, void* out) {
+    if (deque->_size == 0)
+        return 0;
+    size_t last_idx = (deque->_tail - 1 + deque->_capacity) & deque->_mask;
+    memcpy(out, deque->_memory + last_idx * deque->_element_size, deque->_element_size);
+    return 1;
+}
+
+bool arraydeque_peekleft(const ArrayDeque* deque, void* out) {
+    if (deque->_size == 0)
+        return 0;
+    memcpy(out, deque->_memory + deque->_head * deque->_element_size, deque->_element_size);
+    return 1;
 }
 
 void arraydeque_append(ArrayDeque* deque, const void* element) {
@@ -857,9 +893,15 @@ ArrayDeque arraydeque_copy(const ArrayDeque* deque) {
     return copy;
 }
 
-void arraydeque_foreach(ArrayDeque* deque, void(*function)(int, void*)) {
-    int curr = deque->_head;
-    for (int i = 0; i < deque->_size; i++){
+void arraydeque_clear(ArrayDeque* deque) {
+    deque->_size = 0;
+    deque->_head = 0;
+    deque->_tail = 0;
+}
+
+void arraydeque_foreach(ArrayDeque* deque, void(*function)(size_t, void*)) {
+    size_t curr = deque->_head;
+    for (size_t i = 0; i < deque->_size; i++){
         function(i, deque->_memory + curr * deque->_element_size);
         curr = (curr + 1) & deque->_mask;   
     }
@@ -874,7 +916,7 @@ static inline void heap_resize(Heap* heap) {
     heap->_memory = realloc(heap->_memory, heap->_capacity * heap->_element_size);
 }
 
-Heap heap_create(int element_size, cmp_fn cmp) {
+Heap heap_create(size_t element_size, cmp_fn cmp) {
     Heap heap = {
         ._capacity = START_CAPACITY,
         ._element_size = element_size,
@@ -891,7 +933,7 @@ void heap_free(Heap* heap) {
     heap->_memory = NULL;
 }
 
-int heap_length(const Heap* heap) {
+size_t heap_length(const Heap* heap) {
     return heap->_size;
 }
 
@@ -899,9 +941,9 @@ void heap_push(Heap* heap, const void* element) {
     if (heap->_size == heap->_capacity)
         heap_resize(heap);
 
-    int i = heap->_size;
+    size_t i = heap->_size;
     while (i > 0) {
-        const int p = (i - 1) >> 1;
+        const size_t p = (i - 1) >> 1;
         const void* p_ptr = heap->_memory + p * heap->_element_size;
         if (heap->_cmp(p_ptr, element) <= 0)
             break;
@@ -937,13 +979,13 @@ bool heap_pop(Heap* heap, void* out) {
         return 1;
 
     const void* value = heap->_memory + heap->_size * heap->_element_size;
-    int i = 0;
+    size_t i = 0;
 
     while (1) {
-        const int l = (i << 1) + 1;
-        const int r = (i << 1) + 2;
+        const size_t l = (i << 1) + 1;
+        const size_t r = (i << 1) + 2;
 
-        int m = i;
+        size_t m = i;
         const void* min_ptr = value;
 
         if (l < heap->_size) {
@@ -982,6 +1024,13 @@ bool heap_pop(Heap* heap, void* out) {
     return 1;
 }
 
+bool heap_peek(Heap* heap, void* out) {
+    if (heap->_size == 0)
+        return 0;
+    memcpy(out, heap->_memory, heap->_element_size);
+    return 1;
+}
+
 Heap heap_copy(const Heap* heap) {
     Heap copy = {
         ._capacity = heap->_capacity,
@@ -996,8 +1045,12 @@ Heap heap_copy(const Heap* heap) {
     return copy;
 }
 
-void heap_foreach(const Heap* heap, void(*function)(int, const void*)) {
-    for (int i = 0; i < heap->_size; i++){
+void heap_clear(Heap* heap) {
+    heap->_size = 0;
+}
+
+void heap_foreach(const Heap* heap, void(*function)(size_t, const void*)) {
+    for (size_t i = 0; i < heap->_size; i++){
         function(i, heap->_memory + i * heap->_element_size);
     }
 }
@@ -1011,24 +1064,24 @@ static inline uint64_t double_hash_step(uint64_t hash) {
 }
 
 static inline void hashmap_resize(HashMap* map) {
-    int new_capacity = map->_capacity << 1;
-    int new_mask = new_capacity - 1;
+    size_t new_capacity = map->_capacity << 1;
+    size_t new_mask = new_capacity - 1;
 
     uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
     uint8_t* new_states = calloc(new_capacity, sizeof(uint8_t));
     uint8_t* new_keys = malloc(map->_key_size * new_capacity);
     uint8_t* new_values = malloc(map->_value_size * new_capacity);
 
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[i] != HASHTABLE_USED) 
             continue;
         
         uint64_t hash = map->_hash_cache[i];
         uint64_t step = double_hash_step(hash);
 
-        uint64_t idx = hash & new_mask;
+        size_t idx = hash & new_mask;
 
-        for (int j = 0; j < new_capacity; j++){
+        for (size_t j = 0; j < new_capacity; j++){
             if (new_states[idx] == HASHTABLE_EMPTY) {
                 new_states[idx] = HASHTABLE_USED;
                 new_hash_cache[idx] = hash;
@@ -1050,7 +1103,7 @@ static inline void hashmap_resize(HashMap* map) {
 
     map->_capacity = new_capacity;
     map->_mask = new_mask;
-    map->_max_elements = new_capacity * HASHMAP_FACTOR;
+    map->_max_elements = new_capacity - (new_capacity >> 2);
     free(map->_states);
     free(map->_hash_cache);
     free(map->_keys);
@@ -1062,15 +1115,15 @@ static inline void hashmap_resize(HashMap* map) {
 }
 
 HashMap hashmap_create(
-    int key_size,
-    int value_size,
+    size_t key_size,
+    size_t value_size,
     equals_fn equals,
     hash_fn hash
 ) {
     HashMap map = {
         ._capacity = START_CAPACITY,
         ._mask = START_CAPACITY - 1,
-        ._max_elements = START_CAPACITY * HASHMAP_FACTOR,
+        ._max_elements = START_CAPACITY - (START_CAPACITY >> 2),
         ._key_size = key_size,
         ._value_size = value_size,
         ._equals = equals,
@@ -1096,7 +1149,7 @@ void hashmap_free(HashMap* map) {
     map->_hash_cache = NULL;
 }
 
-int hashmap_length(const HashMap* map) {
+size_t hashmap_length(const HashMap* map) {
     return map->_size;
 }
 
@@ -1107,11 +1160,11 @@ void hashmap_set(HashMap* map, const void* key, const void* value, void* old_val
     uint64_t hash = map->_hash(key);
     uint64_t step = double_hash_step(hash);
 
-    uint64_t idx = hash & map->_mask;
-    int location = -1;
+    size_t idx = hash & map->_mask;
+    size_t location = SIZE_MAX;
 
-    for (int i = 0; i < map->_capacity; i++){
-        if (map->_states[idx] != HASHTABLE_USED && location == -1) {
+    for (size_t i = 0; i < map->_capacity; i++){
+        if (map->_states[idx] != HASHTABLE_USED && location == SIZE_MAX) {
             location = idx;
         } else if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + map->_key_size * idx, key)) {
             void* ptr = map->_values + idx * map->_value_size;
@@ -1137,9 +1190,9 @@ bool hashmap_get(const HashMap* map, const void* key, void* out) {
     uint64_t hash = map->_hash(key);
     uint64_t step = double_hash_step(hash);
 
-    uint64_t idx = hash & map->_mask;
+    size_t idx = hash & map->_mask;
 
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[idx] == HASHTABLE_EMPTY)
             return 0;
         if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
@@ -1160,9 +1213,9 @@ bool hashmap_remove(HashMap* map, const void* key, void* out) {
     uint64_t hash = map->_hash(key);
     uint64_t step = double_hash_step(hash);
 
-    uint64_t idx = hash & map->_mask;
+    size_t idx = hash & map->_mask;
 
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[idx] == HASHTABLE_EMPTY)
             return 0;
         if (map->_states[idx] == HASHTABLE_USED && map->_hash_cache[idx] == hash && map->_equals(map->_keys + idx * map->_key_size, key)) {
@@ -1183,7 +1236,7 @@ bool hashmap_remove(HashMap* map, const void* key, void* out) {
 HashMap hashmap_copy(const HashMap* map) {
     HashMap copy = hashmap_create(map->_key_size, map->_value_size, map->_equals, map->_hash);
 
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[i] != HASHTABLE_USED) 
             continue;
         
@@ -1193,8 +1246,15 @@ HashMap hashmap_copy(const HashMap* map) {
     return copy;
 }
 
+void hashmap_clear(HashMap* map) {
+    map->_size = 0;
+    for (size_t i = 0; i < map->_capacity; i++){
+        map->_states[i] = HASHTABLE_EMPTY;
+    }
+}
+
 void hashmap_keys(const HashMap* map, void (*function)(const void*)) {
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[i] != HASHTABLE_USED)
             continue;
         function(map->_keys + i * map->_key_size);
@@ -1202,7 +1262,7 @@ void hashmap_keys(const HashMap* map, void (*function)(const void*)) {
 }
 
 void hashmap_values(HashMap* map, void (*function)(void*)) {
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[i] != HASHTABLE_USED)
             continue;
         function(map->_values + i * map->_value_size);
@@ -1210,7 +1270,7 @@ void hashmap_values(HashMap* map, void (*function)(void*)) {
 }
 
 void hashmap_items(HashMap* map, void (*function)(const void*, void*)) {
-    for (int i = 0; i < map->_capacity; i++){
+    for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[i] != HASHTABLE_USED)
             continue;
         function(map->_keys + i * map->_key_size, map->_values + i * map->_value_size);
@@ -1222,23 +1282,23 @@ void hashmap_items(HashMap* map, void (*function)(const void*, void*)) {
 // ==========================================================
 
 static inline void hashset_resize(HashSet* set) {
-    int new_capacity = set->_capacity << 1;
-    int new_mask = new_capacity - 1;
+    size_t new_capacity = set->_capacity << 1;
+    size_t new_mask = new_capacity - 1;
 
     uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
     uint8_t* new_states = calloc(new_capacity, sizeof(uint8_t));
     uint8_t* new_elements = malloc(set->_element_size * new_capacity);
 
-    for (int i = 0; i < set->_capacity; i++){
+    for (size_t i = 0; i < set->_capacity; i++){
         if (set->_states[i] != HASHTABLE_USED) 
             continue;
         
         uint64_t hash = set->_hash_cache[i];
         uint64_t step = double_hash_step(hash);
 
-        uint64_t idx = hash & new_mask;
+        size_t idx = hash & new_mask;
 
-        for (int j = 0; j < new_capacity; j++){
+        for (size_t j = 0; j < new_capacity; j++){
             if (new_states[idx] == HASHTABLE_EMPTY) {
                 new_states[idx] = HASHTABLE_USED;
                 new_hash_cache[idx] = hash;
@@ -1255,7 +1315,7 @@ static inline void hashset_resize(HashSet* set) {
 
     set->_capacity = new_capacity;
     set->_mask = new_mask;
-    set->_max_elements = new_capacity * HASHMAP_FACTOR;
+    set->_max_elements = new_capacity - (new_capacity >> 2);
     free(set->_states);
     free(set->_hash_cache);
     free(set->_elements);
@@ -1265,14 +1325,14 @@ static inline void hashset_resize(HashSet* set) {
 }
 
 HashSet hashset_create(
-    int element_size,
+    size_t element_size,
     equals_fn equals,
     hash_fn hash
 ) {
     HashSet set = {
         ._capacity = START_CAPACITY,
         ._mask = START_CAPACITY - 1,
-        ._max_elements = START_CAPACITY * HASHMAP_FACTOR,
+        ._max_elements = START_CAPACITY - (START_CAPACITY >> 2),
         ._element_size = element_size,
         ._equals = equals,
         ._hash = hash,
@@ -1294,7 +1354,7 @@ void hashset_free(HashSet* set) {
     set->_elements = NULL;
 }
 
-int hashset_length(const HashSet* set) {
+size_t hashset_length(const HashSet* set) {
     return set->_size;
 }
 
@@ -1305,11 +1365,11 @@ bool hashset_add(HashSet* set, const void* element) {
     uint64_t hash = set->_hash(element);
     uint64_t step = double_hash_step(hash);
 
-    uint64_t idx = hash & set->_mask;
-    int location = -1;
+    size_t idx = hash & set->_mask;
+    size_t location = SIZE_MAX;
 
-    for (int i = 0; i < set->_capacity; i++){
-        if (set->_states[idx] != HASHTABLE_USED && location == -1) {
+    for (size_t i = 0; i < set->_capacity; i++){
+        if (set->_states[idx] != HASHTABLE_USED && location == SIZE_MAX) {
             location = idx;
         } else if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + set->_element_size * idx, element)) {
             return 0;
@@ -1330,9 +1390,9 @@ bool hashset_has(const HashSet* set, const void* element) {
     uint64_t hash = set->_hash(element);
     uint64_t step = double_hash_step(hash);
 
-    uint64_t idx = hash & set->_mask;
+    size_t idx = hash & set->_mask;
 
-    for (int i = 0; i < set->_capacity; i++){
+    for (size_t i = 0; i < set->_capacity; i++){
         if (set->_states[idx] == HASHTABLE_EMPTY)
             return 0;
         if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
@@ -1347,9 +1407,9 @@ bool hashset_remove(HashSet* set, const void* element) {
     uint64_t hash = set->_hash(element);
     uint64_t step = double_hash_step(hash);
 
-    uint64_t idx = hash & set->_mask;
+    size_t idx = hash & set->_mask;
 
-    for (int i = 0; i < set->_capacity; i++){
+    for (size_t i = 0; i < set->_capacity; i++){
         if (set->_states[idx] == HASHTABLE_EMPTY)
             return 0;
         if (set->_states[idx] == HASHTABLE_USED && set->_hash_cache[idx] == hash && set->_equals(set->_elements + idx * set->_element_size, element)) {
@@ -1365,7 +1425,7 @@ bool hashset_remove(HashSet* set, const void* element) {
 HashSet hashset_copy(const HashSet* set) {
     HashSet copy = hashset_create(set->_element_size, set->_equals, set->_hash);
 
-    for (int i = 0; i < set->_capacity; i++){
+    for (size_t i = 0; i < set->_capacity; i++){
         if (set->_states[i] != HASHTABLE_USED)
             continue;
 
@@ -1375,10 +1435,17 @@ HashSet hashset_copy(const HashSet* set) {
     return copy;
 }
 
+void hashset_clear(HashSet* set) {
+    set->_size = 0;
+    for (size_t i = 0; i < set->_capacity; i++){
+        set->_states[i] = HASHTABLE_EMPTY;
+    }
+}
+
 HashSet hashset_union(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
     
-    for (int i = 0; i < b->_capacity; i++){
+    for (size_t i = 0; i < b->_capacity; i++){
         if (b->_states[i] != HASHTABLE_USED)
             continue;
 
@@ -1402,7 +1469,7 @@ HashSet hashset_intersection(const HashSet* a, const HashSet* b) {
 
     HashSet result = hashset_create(a->_element_size, a->_equals, a->_hash);
 
-    for (int i = 0; i < smaller->_capacity; i++){
+    for (size_t i = 0; i < smaller->_capacity; i++){
         if (smaller->_states[i] != HASHTABLE_USED)
             continue;
 
@@ -1417,7 +1484,7 @@ HashSet hashset_intersection(const HashSet* a, const HashSet* b) {
 HashSet hashset_difference(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
 
-    for (int i = 0; i < b->_capacity; i++){
+    for (size_t i = 0; i < b->_capacity; i++){
         if (b->_states[i] != HASHTABLE_USED)
             continue;
 
@@ -1428,7 +1495,7 @@ HashSet hashset_difference(const HashSet* a, const HashSet* b) {
 }
 
 void hashset_foreach(const HashSet* set, void (*function)(const void*)) {
-    for (int i = 0; i < set->_capacity; i++){
+    for (size_t i = 0; i < set->_capacity; i++){
         if (set->_states[i] != HASHTABLE_USED)
             continue;
         function(set->_elements + i * set->_element_size);
@@ -1457,7 +1524,7 @@ static uint64_t hash_element_bytes(const uint8_t* data, size_t size) {
     return hash;
 }
 
-FrozenHashSet frozenhashset_empty(int element_size, equals_fn equals, hash_fn hash) {
+FrozenHashSet frozenhashset_empty(size_t element_size, equals_fn equals, hash_fn hash) {
     FrozenHashSet f_set = {
         ._checksum_computed = 1,
         ._checksum = 0,
@@ -1487,7 +1554,7 @@ FrozenHashSet frozenhashset_copy(const FrozenHashSet* f_set) {
     return copy;
 }
 
-int frozenhashset_length(const FrozenHashSet* f_set) {
+size_t frozenhashset_length(const FrozenHashSet* f_set) {
     return f_set->_set._size;
 }
 
@@ -1503,7 +1570,7 @@ bool frozenhashset_equals(const FrozenHashSet* a, const FrozenHashSet* b) {
     if (a->_set._element_size != b->_set._element_size)
         return 0;
     
-    for (int i = 0; i < a->_set._capacity; i++){
+    for (size_t i = 0; i < a->_set._capacity; i++){
         if (a->_set._states[i] != HASHTABLE_USED)
             continue;
         
@@ -1518,7 +1585,7 @@ uint64_t frozenhashset_hash(FrozenHashSet* f_set) {
     if (f_set->_checksum_computed)
         return f_set->_checksum;
 
-    for (int i = 0; i < f_set->_set._capacity; i++){
+    for (size_t i = 0; i < f_set->_set._capacity; i++){
         if (f_set->_set._states[i] != HASHTABLE_USED)
             continue;
         
@@ -1562,8 +1629,8 @@ void frozenhashset_foreach(const FrozenHashSet* f_set, void (*function)(const vo
 // TRIE
 // ==========================================================
 
-static inline int trie_get_or_create_children(Trie* trie, int parent) {
-    if (trie->_nodes[parent]._children != -1)
+static inline size_t trie_get_or_create_children(Trie* trie, size_t parent) {
+    if (trie->_nodes[parent]._children != TRIE_NO_NODE)
         return trie->_nodes[parent]._children;
 
     if (trie->_used + ALPHABET_SIZE > trie->_capacity) {
@@ -1571,10 +1638,10 @@ static inline int trie_get_or_create_children(Trie* trie, int parent) {
         trie->_nodes = realloc(trie->_nodes, trie->_capacity * sizeof(TrieNode));
     }
 
-    int children = trie->_used;
+    size_t children = trie->_used;
 
-    TrieNode default_node = {._parent = parent, ._children = -1, ._is_word = 0};
-    for (int i = 0; i < ALPHABET_SIZE; i++){
+    TrieNode default_node = {._parent = parent, ._children = TRIE_NO_NODE, ._is_word = 0};
+    for (size_t i = 0; i < ALPHABET_SIZE; i++){
         trie->_nodes[children + i] = default_node;
     }
 
@@ -1590,11 +1657,11 @@ Trie trie_create() {
         ._size = 0,
         ._nodes = malloc(sizeof(TrieNode) * START_TRIE_CAPACITY)
     };
-    for (int i = 0; i < ALPHABET_SIZE; i++){
+    for (size_t i = 0; i < ALPHABET_SIZE; i++){
         trie._nodes[i] = (TrieNode) {
-            ._parent = -1,
+            ._parent = TRIE_NO_NODE,
             ._is_word = 0,
-            ._children = -1
+            ._children = TRIE_NO_NODE
         };
     }
     
@@ -1613,13 +1680,25 @@ Trie trie_copy(const Trie* trie) {
     return copy;
 }
 
+void trie_clear(Trie* trie) {
+    trie->_size = 0;
+    trie->_used = ALPHABET_SIZE;
+    for (size_t i = 0; i < ALPHABET_SIZE; i++){
+        trie->_nodes[i] = (TrieNode) {
+            ._parent = TRIE_NO_NODE,
+            ._is_word = 0,
+            ._children = TRIE_NO_NODE
+        };
+    }
+}
+
 void trie_add_str(Trie* trie, const char* str) {
     uint8_t c;
-    int node_idx = (uint8_t)(*(str++));
+    size_t node_idx = (uint8_t)(*(str++));
     if (node_idx == 0)
         return;
     while((c = *(str++))) {
-        int children = trie_get_or_create_children(trie, node_idx);
+        size_t children = trie_get_or_create_children(trie, node_idx);
         node_idx = children + c;
     }
     if (trie->_nodes[node_idx]._is_word) 
@@ -1632,17 +1711,17 @@ void trie_add_string(Trie* trie, const String* string) {
     trie_add_str(trie, string->_memory);
 }
 
-int trie_length(const Trie* trie) {
+size_t trie_length(const Trie* trie) {
     return trie->_size;
 }
 
 bool trie_has_str(const Trie* trie, const char* str) {
     uint8_t c;
-    int node_idx = (uint8_t)*(str++);
+    size_t node_idx = (uint8_t)*(str++);
     if (node_idx == 0)
         return 0;
     while((c = *(str++))) {
-        if (trie->_nodes[node_idx]._children == -1)
+        if (trie->_nodes[node_idx]._children == TRIE_NO_NODE)
             return 0;
         node_idx = trie->_nodes[node_idx]._children + c;
     }
@@ -1655,15 +1734,15 @@ bool trie_has_string(const Trie* trie, const String* string) {
 
 bool trie_has_prefix_str(const Trie* trie, const char* str) {
     uint8_t c;
-    int node_idx = (uint8_t)*(str++);
+    size_t node_idx = (uint8_t)*(str++);
     if (node_idx == 0)
         return 0;
     while((c = *(str++))) {
-        if (trie->_nodes[node_idx]._children == -1)
+        if (trie->_nodes[node_idx]._children == TRIE_NO_NODE)
             return 0;
         node_idx = trie->_nodes[node_idx]._children + c;
     }
-    return trie->_nodes[node_idx]._is_word || trie->_nodes[node_idx]._parent != -1;
+    return trie->_nodes[node_idx]._is_word || trie->_nodes[node_idx]._parent != TRIE_NO_NODE;
 }
 
 bool trie_has_prefix_string(const Trie* trie, const String* string) {
@@ -1674,8 +1753,8 @@ bool trie_has_prefix_string(const Trie* trie, const String* string) {
 // OBJECT POOL
 // ==========================================================
 
-ObjectPool objpool_create(int max_capacity, int obj_size) {
-    obj_size = (obj_size + 7) & ~7;
+ObjectPool objpool_create(size_t max_capacity, size_t obj_size) {
+    obj_size = (obj_size + (size_t)7) & ~(size_t)7;
     ObjectPool pool = {
         ._capacity = max_capacity,
         ._obj_size = obj_size,
@@ -1684,8 +1763,8 @@ ObjectPool objpool_create(int max_capacity, int obj_size) {
         ._memory = malloc(obj_size * max_capacity)
     };
 
-    for (int i = 0; i < max_capacity - 1; i++){
-        *(int*)(pool._memory + i * obj_size) = i + 1;
+    for (size_t i = 0; i + 1 < max_capacity; i++){
+        *(size_t*)(pool._memory + i * obj_size) = i + 1;
     }
 
     return pool;
@@ -1696,7 +1775,7 @@ void objpool_free(ObjectPool* pool) {
     pool->_memory = NULL;
 }
 
-int objpool_available(const ObjectPool* pool) {
+size_t objpool_available(const ObjectPool* pool) {
     return pool->_capacity - pool->_used;
 }
 
@@ -1705,14 +1784,14 @@ void* objpool_malloc(ObjectPool* pool) {
         return NULL;
     
     void* obj = pool->_memory + pool->_head * pool->_obj_size;
-    pool->_head = *(int*)obj;
+    pool->_head = *(size_t*)obj;
     pool->_used++;
     return obj;
 }
 
 void objpool_free_obj(ObjectPool* pool, void* obj) {
-    *(int*)obj = pool->_head;
-    pool->_head = ((uint8_t*)obj - pool->_memory) / pool->_obj_size;
+    *(size_t*)obj = pool->_head;
+    pool->_head = (size_t)((uint8_t*)obj - pool->_memory) / pool->_obj_size;
     pool->_used--;
 }
 
@@ -1720,7 +1799,7 @@ void objpool_free_obj(ObjectPool* pool, void* obj) {
 // ARENA POOL
 // ==========================================================
 
-ArenaPool arenapool_create(int total_bytes) {
+ArenaPool arenapool_create(size_t total_bytes) {
     ArenaPool arena = {
         ._capacity = total_bytes,
         ._used = 0,
@@ -1735,12 +1814,12 @@ void arenapool_free(ArenaPool* arena) {
     arena->_memory = NULL;
 }
 
-int arenapool_available(ArenaPool* arena) {
+size_t arenapool_available(const ArenaPool* arena) {
     return arena->_capacity - arena->_used;
 }
 
-void* arenapool_malloc(ArenaPool* arena, int byte_count) {
-    byte_count = (byte_count + 7) & ~7;
+void* arenapool_malloc(ArenaPool* arena, size_t byte_count) {
+    byte_count = (byte_count + (size_t)7) & ~(size_t)7;
     if (arena->_used + byte_count > arena->_capacity)
         return NULL;
 
@@ -1758,8 +1837,8 @@ static inline void bytearray_resize(ByteArray* bytearray) {
     bytearray->_data = realloc(bytearray->_data, bytearray->_capacity);
 }
 
-ByteArray bytearray_create(int initial_capacity) {
-    initial_capacity = int_max(initial_capacity, 0);
+ByteArray bytearray_create(size_t initial_capacity) {
+    initial_capacity = initial_capacity < START_CAPACITY ? START_CAPACITY : initial_capacity;
     ByteArray bytearray = {
         ._capacity = initial_capacity,
         ._size = 0,
@@ -1782,42 +1861,45 @@ ByteArray bytearray_copy(const ByteArray* bytearray){
     return copy;
 }
 
-void bytearray_reserve(ByteArray* bytearray, int new_capacity) {
+void bytearray_clear(ByteArray* bytearray) {
+    bytearray->_size = 0;
+    bytearray->_cursor = 0;
+}
+
+void bytearray_reserve(ByteArray* bytearray, size_t new_capacity) {
     if (new_capacity <= bytearray->_capacity)
         return;
     bytearray->_data = realloc(bytearray->_data, new_capacity);
     bytearray->_capacity = new_capacity;
 }
 
-void bytearray_clear(ByteArray* bytearray) {
-    bytearray->_size = 0;
-    bytearray->_cursor = 0;
-}
-
-void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, int size) {
-    while(bytearray->_cursor + size > bytearray->_capacity)
+void bytearray_write_bytes(ByteArray* bytearray, const void* bytes, size_t size) {
+    while(size > bytearray->_capacity - bytearray->_cursor)
         bytearray_resize(bytearray);
     memcpy(bytearray->_data + bytearray->_cursor, bytes, size);
     bytearray->_cursor += size;
-    bytearray->_size = int_max(bytearray->_size, bytearray->_cursor);
+    bytearray->_size = bytearray->_size > bytearray->_cursor
+        ? bytearray->_size
+        : bytearray->_cursor;
 }
 
-int bytearray_read_bytes(ByteArray* bytearray, void* out, int size) {
-    int bytes_to_read = int_min((unsigned int)size, bytearray->_size - bytearray->_cursor);
+size_t bytearray_read_bytes(ByteArray* bytearray, void* out, size_t size) {
+    size_t available = bytearray->_size - bytearray->_cursor;
+    size_t bytes_to_read = size < available ? size : available;
     if (out)
         memcpy(out, bytearray->_data + bytearray->_cursor, bytes_to_read);
     bytearray->_cursor += bytes_to_read;
     return bytes_to_read;
 }
 
-bool bytearray_seek(ByteArray* bytearray, int offset) {
-    if ((unsigned int)offset >= bytearray->_capacity)
+bool bytearray_seek(ByteArray* bytearray, size_t offset) {
+    if (offset >= bytearray->_size)
         return 0;
     bytearray->_cursor = offset;
     return 1;
 }
 
-int bytearray_available(const ByteArray* bytearray) {
+size_t bytearray_available(const ByteArray* bytearray) {
     return bytearray->_size - bytearray->_cursor;
 }
 
@@ -1825,8 +1907,8 @@ int bytearray_available(const ByteArray* bytearray) {
 // BIT SET
 // ==========================================================
 
-BitSet bitset_create(int size) {
-    size = (size + BITSET_MASK) & ~BITSET_MASK;
+BitSet bitset_create(size_t size) {
+    size = (size + (size_t)BITSET_MASK) & ~(size_t)BITSET_MASK;
     BitSet bitset = {
         ._size = size,
         ._data = calloc(size, 1)
@@ -1858,43 +1940,67 @@ void bitset_fill(BitSet* bitset, bool value) {
     memset(bitset->_data, 0xff * value, bitset->_size);
 }
 
-void bitset_set(BitSet* bitset, int bit) {
-    const int idx = bit >> BITSET_SHIFT;
+#if defined(_MSC_VER)
+    #define POPCOUNT64(x) __popcnt64(x)
+#elif defined(__GNUC__) || defined(__clang__)
+    #define POPCOUNT64(x) __builtin_popcountll(x)
+#else
+    static inline int popcount_fallback(uint64_t n) {
+        int contador = 0;
+        while (n) {
+            n &= (n - 1);
+            contador++;
+        }
+        return contador;
+    }
+    #define POPCOUNT64(x) popcount_fallback(x)
+#endif
+
+size_t bitset_count(const BitSet* bitset) {
+    size_t count = 0;
+    for (size_t i = 0; i < bitset->_size >> BITSET_SHIFT; i++){
+        count += (size_t)POPCOUNT64(bitset->_data[i]);
+    }
+    return count;
+}
+
+void bitset_set(BitSet* bitset, size_t bit) {
+    const size_t idx = bit >> BITSET_SHIFT;
     bitset->_data[idx] |= (1ULL << (bit & BITSET_MASK));
 }
 
-bool bitset_get(const BitSet* bitset, int bit) {
-    const int idx = bit >> BITSET_SHIFT;
+bool bitset_get(const BitSet* bitset, size_t bit) {
+    const size_t idx = bit >> BITSET_SHIFT;
     return (bitset->_data[idx] & (1ULL << (bit & BITSET_MASK))) != 0;
 }
 
-void bitset_flip(BitSet* bitset, int bit) {
-    const int idx = bit >> BITSET_SHIFT;
+void bitset_flip(BitSet* bitset, size_t bit) {
+    const size_t idx = bit >> BITSET_SHIFT;
     bitset->_data[idx] ^= (1ULL << (bit & BITSET_MASK));
 }
 
-void bitset_reset(BitSet* bitset, int bit) {
-    const int idx = bit >> BITSET_SHIFT;
+void bitset_reset(BitSet* bitset, size_t bit) {
+    const size_t idx = bit >> BITSET_SHIFT;
     bitset->_data[idx] &= ~(1ULL << (bit & BITSET_MASK));
 }
 
 BitSet bitset_and(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
-    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] &= b->_data[i];
     return result;
 }
 
 BitSet bitset_or(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
-    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] |= b->_data[i];
     return result;
 }
 
 BitSet bitset_xor(const BitSet* a, const BitSet* b) {
     BitSet result = bitset_copy(a);
-    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] ^= b->_data[i];
     return result;
 }
@@ -1905,89 +2011,85 @@ BitSet bitset_not(const BitSet* a) {
         ._data = malloc(a->_size)
     };
 
-    for (int i = 0; i < a->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < a->_size >> BITSET_SHIFT; i++)
         result._data[i] = ~a->_data[i];
 
     return result;
 }
 
 bool bitset_any(const BitSet* bitset) {
-    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
         if (bitset->_data[i]) return 1;
     
     return 0;
 }
 
 bool bitset_all(const BitSet* bitset) {
-    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
         if (bitset->_data[i] != 0xffffffffffffffffULL) return 0;
 
     return 1;
 }
 
 bool bitset_none(const BitSet* bitset) {
-    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
+    for (size_t i = 0; i < bitset->_size >> BITSET_SHIFT; i++)
         if (bitset->_data[i] != 0) return 0;
 
     return 1;
 }
 
-#if defined(_MSC_VER)
-    #include <intrin.h>
-#endif
-
 int bitset_first(const BitSet* bitset) {
-    for (int i = 0; i < bitset->_size >> BITSET_SHIFT; i++){
+    for (size_t i = 0; i < bitset->_size >> BITSET_SHIFT; i++){
         if (bitset->_data[i] == 0)
             continue;
-        int bit = i << BITSET_SHIFT;
         uint64_t val = bitset->_data[i];
+        size_t position;
 
         #if defined(_MSC_VER)
             unsigned long index;
             _BitScanForward64(&index, val);
-            bit += (int)index;
+            position = index;
         #elif defined(__GNUC__) || defined(__clang__)
-            bit += __builtin_ctzll(val);
+            position = (size_t)__builtin_ctzll(val);
         #else
-            int pos = 0;
-            if ((val & 0xFFFFFFFF) == 0) { val >>= 32; pos += 32; }
-            if ((val & 0xFFFF) == 0)     { val >>= 16; pos += 16; }
-            if ((val & 0xFF) == 0)       { val >>= 8;  pos += 8;  }
-            if ((val & 0xF) == 0)        { val >>= 4;  pos += 4;  }
-            if ((val & 0x3) == 0)        { val >>= 2;  pos += 2;  }
-            if ((val & 0x1) == 0)        { pos += 1; }
-            bit += pos;
+            position = 0;
+            if ((val & 0xFFFFFFFF) == 0) { val >>= 32; position += 32; }
+            if ((val & 0xFFFF) == 0)     { val >>= 16; position += 16; }
+            if ((val & 0xFF) == 0)       { val >>= 8;  position += 8;  }
+            if ((val & 0xF) == 0)        { val >>= 4;  position += 4;  }
+            if ((val & 0x3) == 0)        { val >>= 2;  position += 2;  }
+            if ((val & 0x1) == 0)        { position += 1; }
         #endif
-        return bit;
+        size_t bit = (i << BITSET_SHIFT) + position;
+        return bit <= INT_MAX ? (int)bit : -1;
     }
 
     return -1;
 }
 
 int bitset_last(const BitSet* bitset) {
-    for (int i = (bitset->_size >> BITSET_SHIFT) - 1; i >= 0; i--){
+    for (size_t i = bitset->_size >> BITSET_SHIFT; i-- > 0;){
         if (bitset->_data[i] == 0)
             continue;
-        int bit = i << BITSET_SHIFT;
         uint64_t val = bitset->_data[i];
+        size_t position;
         #if defined(_MSC_VER)
             unsigned long index;
             _BitScanReverse64(&index, val);
-            bit += (int)index;
+            position = index;
         #elif defined(__GNUC__) || defined(__clang__)
-            bit += 63 - __builtin_clzll(val);
+            position = (size_t)(63 - __builtin_clzll(val));
         #else
-            int pos = 0;
-            if (val >= 0x100000000ULL) { val >>= 32; pos += 32; }
-            if (val >= 0x00010000ULL)  { val >>= 16; pos += 16; }
-            if (val >= 0x00000100ULL)  { val >>= 8;  pos += 8;  }
-            if (val >= 0x00000010ULL)  { val >>= 4;  pos += 4;  }
-            if (val >= 0x00000004ULL)  { val >>= 2;  pos += 2;  }
-            if (val >= 0x00000002ULL)  { pos += 1; }
-            bit += pos;
+            position = 0;
+            if (val >= 0x100000000ULL) { val >>= 32; position += 32; }
+            if (val >= 0x00010000ULL)  { val >>= 16; position += 16; }
+            if (val >= 0x00000100ULL)  { val >>= 8;  position += 8;  }
+            if (val >= 0x00000010ULL)  { val >>= 4;  position += 4;  }
+            if (val >= 0x00000004ULL)  { val >>= 2;  position += 2;  }
+            if (val >= 0x00000002ULL)  { position += 1; }
         #endif
-        return bit;
+        size_t bit = (i << BITSET_SHIFT) + position;
+        return bit <= INT_MAX ? (int)bit : -1;
     }
     return -1;
 }
@@ -1996,7 +2098,7 @@ int bitset_last(const BitSet* bitset) {
 // INDEXED PRIORITY QUEUE
 // ==========================================================
 
-IndexedPriorityQueue indexedpq_create(int element_size, int priority_count) {
+IndexedPriorityQueue indexedpq_create(size_t element_size, size_t priority_count) {
     IndexedPriorityQueue ipq = {
         ._priority_count = priority_count,
         ._element_size = element_size,
@@ -2005,7 +2107,7 @@ IndexedPriorityQueue indexedpq_create(int element_size, int priority_count) {
         ._buckets = malloc(sizeof(ArrayDeque) * priority_count)
     };
 
-    for (int i = 0; i < priority_count; i++){
+    for (size_t i = 0; i < priority_count; i++){
         ipq._buckets[i] = arraydeque_create(element_size);
     }
 
@@ -2013,7 +2115,7 @@ IndexedPriorityQueue indexedpq_create(int element_size, int priority_count) {
 }
 
 void indexedpq_free(IndexedPriorityQueue* ipq) {
-    for (int i = 0; i < ipq->_priority_count; i++){
+    for (size_t i = 0; i < ipq->_priority_count; i++){
         arraydeque_free(&ipq->_buckets[i]);
     }
 
@@ -2026,14 +2128,22 @@ void indexedpq_free(IndexedPriorityQueue* ipq) {
 IndexedPriorityQueue indexedpq_copy(const IndexedPriorityQueue* ipq) {
     IndexedPriorityQueue copy = *ipq;
     copy._min_bucket_reference = bitset_copy(&ipq->_min_bucket_reference);
-    for (int i = 0; i < ipq->_priority_count; i++){
+    for (size_t i = 0; i < ipq->_priority_count; i++){
         copy._buckets[i] = arraydeque_copy(&ipq->_buckets[i]);
     }
     return copy;
 }
 
-bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* element) {
-    if ((uint32_t)priority >= ipq->_priority_count)
+void indexedpq_clear(IndexedPriorityQueue* ipq) {
+    ipq->_size = 0;
+    bitset_clear(&ipq->_min_bucket_reference);
+    for (size_t i = 0; i < ipq->_priority_count; i++){
+        arraydeque_clear(&ipq->_buckets[i]);
+    }
+}
+
+bool indexedpq_enqueue(IndexedPriorityQueue* ipq, size_t priority, const void* element) {
+    if (priority >= ipq->_priority_count)
         return 0;
     arraydeque_append(&ipq->_buckets[priority], element);
     bitset_set(&ipq->_min_bucket_reference, priority);
@@ -2041,10 +2151,13 @@ bool indexedpq_enqueue(IndexedPriorityQueue* ipq, int priority, const void* elem
     return 1;
 }
 
-bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, int* priority_out) {
+bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, size_t* priority_out) {
     if (ipq->_size == 0)
         return 0;
-    uint32_t min_priority = bitset_first(&ipq->_min_bucket_reference);
+    int first_priority = bitset_first(&ipq->_min_bucket_reference);
+    if (first_priority < 0)
+        return false;
+    size_t min_priority = (size_t)first_priority;
     arraydeque_popleft(&ipq->_buckets[min_priority], out);
     if (priority_out)
         *priority_out = min_priority;
@@ -2056,6 +2169,19 @@ bool indexedpq_dequeue(IndexedPriorityQueue* ipq, void* out, int* priority_out) 
     return 1;
 }
 
-int indexedpq_length(const IndexedPriorityQueue* ipq) {
+bool indexedpq_peek(IndexedPriorityQueue* ipq, void* out, size_t* priority_out) {
+    if (ipq->_size == 0)
+        return 0;
+    int first_priority = bitset_first(&ipq->_min_bucket_reference);
+    if (first_priority < 0)
+        return false;
+    size_t min_priority = (size_t)first_priority;
+    arraydeque_peekleft(&ipq->_buckets[min_priority], out);
+    if (priority_out)
+        *priority_out = min_priority;
+    return 1;
+}
+
+size_t indexedpq_length(const IndexedPriorityQueue* ipq) {
     return ipq->_size;
 }

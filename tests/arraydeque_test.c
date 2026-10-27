@@ -6,10 +6,10 @@
 #include "collections.h"
 
 static long long foreach_sum;
-static int foreach_count;
+static size_t foreach_count;
 static bool foreach_indices_valid;
 
-static void accumulate_deque_element(int index, void* element) {
+static void accumulate_deque_element(size_t index, void* element) {
     if (index != foreach_count) {
         foreach_indices_valid = false;
     }
@@ -71,19 +71,20 @@ void test_arraydeque_stack_and_deque_ops(void) {
 
 void test_arraydeque_stress_and_resize(void) {
     ArrayDeque deque = arraydeque_create(sizeof(int));
-    int total_elements = 1000;
+    size_t total_elements = 1000;
 
-    for (int i = 0; i < total_elements; i++) {
-        arraydeque_append(&deque, &i);
+    for (size_t i = 0; i < total_elements; i++) {
+        int value = (int)i;
+        arraydeque_append(&deque, &value);
     }
 
     assert(arraydeque_length(&deque) == total_elements);
 
-    for (int i = 0; i < total_elements; i++) {
+    for (size_t i = 0; i < total_elements; i++) {
         int out = -1;
         bool status = arraydeque_popleft(&deque, &out);
         assert(status == true);
-        assert(out == i);
+        assert(out == (int)i);
     }
 
     assert(arraydeque_length(&deque) == 0);
@@ -177,15 +178,16 @@ void test_arraydeque_wraparound_resize(void) {
 }
 
 void test_arraydeque_performance(void) {
-    const int num_operations = 1000000; // 1 million operations
+    const size_t num_operations = 1000000;
     ArrayDeque deque = arraydeque_create(sizeof(int));
 
     clock_t start_time = clock();
 
     // 1. Alternating Append & AppendLeft (Triggers Ring Buffer Wraparound)
-    for (int i = 0; i < num_operations / 2; i++) {
-        arraydeque_append(&deque, &i);
-        arraydeque_appendleft(&deque, &i);
+    for (size_t i = 0; i < num_operations / 2; i++) {
+        int value = (int)i;
+        arraydeque_append(&deque, &value);
+        arraydeque_appendleft(&deque, &value);
     }
 
     assert(arraydeque_length(&deque) == num_operations);
@@ -203,7 +205,7 @@ void test_arraydeque_performance(void) {
 
     // 3. Alternating Pop & PopLeft Drain Test
     int out;
-    for (int i = 0; i < num_operations / 2; i++) {
+    for (size_t i = 0; i < num_operations / 2; i++) {
         assert(arraydeque_pop(&deque, &out) == true);
         assert(arraydeque_popleft(&deque, &out) == true);
     }
@@ -213,7 +215,7 @@ void test_arraydeque_performance(void) {
     clock_t end_time = clock();
     double total_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
 
-    printf("[PERFORMANCE] %d appends + %d pops + 1 copy completed in %.2f ms\n",
+    printf("[PERFORMANCE] %zu appends + %zu pops + 1 copy completed in %.2f ms\n",
            num_operations, num_operations, total_time_ms);
 
     arraydeque_free(&deque);

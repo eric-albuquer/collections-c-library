@@ -8,7 +8,7 @@
 #include "collections.h"
 
 static int g_foreach_sum = 0;
-static int g_foreach_count = 0;
+static size_t g_foreach_count = 0;
 
 void accumulate_foreach_func(const void* element) {
     g_foreach_sum += *(const int*)element;
@@ -113,9 +113,9 @@ void test_hashset_set_operations(void) {
 void test_hashset_foreach(void) {
     HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
     int vals[] = {10, 20, 30, 40};
-    int n = sizeof(vals) / sizeof(vals[0]);
+    size_t n = sizeof(vals) / sizeof(vals[0]);
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         hashset_add(&set, &vals[i]);
     }
 
@@ -133,29 +133,34 @@ void test_hashset_foreach(void) {
 void test_hashset_stress_and_performance(void) {
 
     HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
-    int total = 10000;
+    size_t total = 10000;
 
     clock_t start = clock();
 
-    for (int i = 0; i < total; i++) {
-        hashset_add(&set, &i);
+    for (size_t i = 0; i < total; i++) {
+        int value = (int)i;
+        hashset_add(&set, &value);
     }
     assert(hashset_length(&set) == total);
 
-    for (int i = 0; i < total; i++) {
-        assert(hashset_has(&set, &i) == true);
+    for (size_t i = 0; i < total; i++) {
+        int value = (int)i;
+        assert(hashset_has(&set, &value) == true);
     }
 
-    for (int i = 0; i < total / 2; i++) {
-        assert(hashset_remove(&set, &i) == true);
-        assert(hashset_has(&set, &i) == false);
+    for (size_t i = 0; i < total / 2; i++) {
+        int value = (int)i;
+        assert(hashset_remove(&set, &value) == true);
+        assert(hashset_has(&set, &value) == false);
     }
     assert(hashset_length(&set) == total / 2);
-    for (int i = total / 2; i < total; i++) {
-        assert(hashset_has(&set, &i) == true);
+    for (size_t i = total / 2; i < total; i++) {
+        int value = (int)i;
+        assert(hashset_has(&set, &value) == true);
     }
-    for (int i = 0; i < total / 2; i++) {
-        hashset_add(&set, &i);
+    for (size_t i = 0; i < total / 2; i++) {
+        int value = (int)i;
+        hashset_add(&set, &value);
     }
     assert(hashset_length(&set) == total);
 
@@ -163,7 +168,7 @@ void test_hashset_stress_and_performance(void) {
 
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("HashSet benchmark: %d elements inserted, queried, and removed in %.6f seconds.\n",
+    printf("HashSet benchmark: %zu elements inserted, queried, and removed in %.6f seconds.\n",
            total, total_time);
 
 }

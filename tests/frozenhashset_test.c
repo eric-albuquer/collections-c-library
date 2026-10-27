@@ -8,7 +8,7 @@
 #include "collections.h"
 
 static int g_frozen_foreach_sum = 0;
-static int g_frozen_foreach_count = 0;
+static size_t g_frozen_foreach_count = 0;
 
 void accumulate_frozen_foreach_func(const void* element) {
     g_frozen_foreach_sum += *(const int*)element;
@@ -129,9 +129,9 @@ void test_frozenhashset_set_operations(void) {
 void test_frozenhashset_foreach(void) {
     HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
     int vals[] = {5, 15, 25};
-    int n = sizeof(vals) / sizeof(vals[0]);
+    size_t n = sizeof(vals) / sizeof(vals[0]);
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         hashset_add(&set, &vals[i]);
     }
 
@@ -152,10 +152,11 @@ void test_frozenhashset_foreach(void) {
 void test_frozenhashset_stress_and_performance(void) {
 
     HashSet set = hashset_create(sizeof(int), int_equals, int_hash);
-    int total = 5000;
+    size_t total = 5000;
 
-    for (int i = 0; i < total; i++) {
-        hashset_add(&set, &i);
+    for (size_t i = 0; i < total; i++) {
+        int value = (int)i;
+        hashset_add(&set, &value);
     }
 
     clock_t start = clock();
@@ -167,8 +168,9 @@ void test_frozenhashset_stress_and_performance(void) {
     uint64_t checksum_cached = frozenhashset_hash(&fset);
     assert(checksum_cached != 0);
 
-    for (int i = 0; i < total; i++) {
-        assert(frozenhashset_has(&fset, &i) == true);
+    for (size_t i = 0; i < total; i++) {
+        int value = (int)i;
+        assert(frozenhashset_has(&fset, &value) == true);
     }
 
     HashSet copy = hashset_copy(&fset._set);
@@ -181,7 +183,7 @@ void test_frozenhashset_stress_and_performance(void) {
 
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("FrozenHashSet benchmark: %d elements validated in %.6f seconds.\n",
+    printf("FrozenHashSet benchmark: %zu elements validated in %.6f seconds.\n",
            total, total_time);
 
 }

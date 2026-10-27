@@ -17,10 +17,10 @@ int int_asc_compare(const void* a, const void* b) {
 }
 
 static int g_map_sum = 0;
-static int g_map_calls = 0;
+static size_t g_map_calls = 0;
 static bool g_map_indices_valid = true;
 
-void accumulate_map_func(int idx, void* element) {
+void accumulate_map_func(size_t idx, void* element) {
     if (idx != g_map_calls) {
         g_map_indices_valid = false;
     }
@@ -69,7 +69,7 @@ void test_arraylist_get_set(void) {
     ArrayList list = arraylist_create(sizeof(int), 0);
 
     int values[] = {100, 200, 300};
-    for (int i = 0; i < 3; i++) {
+    for (size_t i = 0; i < 3; i++) {
         arraylist_append(&list, &values[i]);
     }
 
@@ -80,7 +80,7 @@ void test_arraylist_get_set(void) {
     assert(arraylist_get(&list, 2, &out) == true);
     assert(out == 300);
 
-    assert(arraylist_get(&list, -1, &out) == false);
+    assert(arraylist_get(&list, SIZE_MAX, &out) == false);
     assert(arraylist_get(&list, 3, &out) == false);
 
     int new_val = 999;
@@ -88,7 +88,7 @@ void test_arraylist_get_set(void) {
     assert(arraylist_get(&list, 1, &out) == true);
     assert(out == 999);
 
-    assert(arraylist_set(&list, -1, &new_val) == false);
+    assert(arraylist_set(&list, SIZE_MAX, &new_val) == false);
     assert(arraylist_set(&list, 10, &new_val) == false);
 
     arraylist_free(&list);
@@ -109,7 +109,7 @@ void test_arraylist_insert_remove_index(void) {
     assert(out == 2);
 
     int invalid = 99;
-    assert(arraylist_insert_index(&list, -1, &invalid) == false);
+    assert(arraylist_insert_index(&list, SIZE_MAX, &invalid) == false);
     assert(arraylist_insert_index(&list, 10, &invalid) == false);
 
     assert(arraylist_remove_index(&list, 1, &out) == true);
@@ -119,7 +119,7 @@ void test_arraylist_insert_remove_index(void) {
     arraylist_get(&list, 1, &out);
     assert(out == 3);
 
-    assert(arraylist_remove_index(&list, -1, &out) == false);
+    assert(arraylist_remove_index(&list, SIZE_MAX, &out) == false);
     assert(arraylist_remove_index(&list, 5, &out) == false);
 
     arraylist_free(&list);
@@ -153,15 +153,15 @@ void test_arraylist_sort_map_shuffle(void) {
     ArrayList list = arraylist_create(sizeof(int), 0);
 
     int unsorted[] = {42, 12, 88, 3, 25};
-    int n = sizeof(unsorted) / sizeof(unsorted[0]);
+    size_t n = sizeof(unsorted) / sizeof(unsorted[0]);
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         arraylist_append(&list, &unsorted[i]);
     }
 
     arraylist_sort(&list, int_asc_compare);
     int expected_sorted[] = {3, 12, 25, 42, 88};
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         int out = 0;
         arraylist_get(&list, i, &out);
         assert(out == expected_sorted[i]);
@@ -175,11 +175,11 @@ void test_arraylist_sort_map_shuffle(void) {
     assert(g_map_sum == (3 + 12 + 25 + 42 + 88));
     assert(g_map_indices_valid);
 
-    int size_before = arraylist_length(&list);
+    size_t size_before = arraylist_length(&list);
     arraylist_shuffle(&list);
     assert(arraylist_length(&list) == size_before);
     arraylist_sort(&list, int_asc_compare);
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         int out = 0;
         assert(arraylist_get(&list, i, &out));
         assert(out == expected_sorted[i]);
@@ -191,7 +191,7 @@ void test_arraylist_sort_map_shuffle(void) {
 void test_arraylist_copy(void) {
     ArrayList original = arraylist_create(sizeof(int), 0);
     int values[] = {4, 8, 15, 16, 23, 42};
-    for (int i = 0; i < 6; i++) {
+    for (size_t i = 0; i < 6; i++) {
         arraylist_append(&original, &values[i]);
     }
 
@@ -199,7 +199,7 @@ void test_arraylist_copy(void) {
     assert(arraylist_length(&copy) == 6);
 
     int out = 0;
-    for (int i = 0; i < 6; i++) {
+    for (size_t i = 0; i < 6; i++) {
         assert(arraylist_get(&copy, i, &out));
         assert(out == values[i]);
     }
@@ -268,19 +268,19 @@ void test_arraylist_performance_and_stress(void) {
     clock_t start = clock();
 
     ArrayList list = arraylist_create(sizeof(int), 0);
-    const int total = 1000000;
+    const size_t total = 1000000;
 
-    for (int i = 0; i < total; i++) {
-        int value = total - i - 1;
+    for (size_t i = 0; i < total; i++) {
+        int value = (int)(total - i - 1);
         arraylist_append(&list, &value);
     }
 
     assert(arraylist_length(&list) == total);
 
-    for (int i = 0; i < total; i++) {
+    for (size_t i = 0; i < total; i++) {
         int out = 0;
         assert(arraylist_get(&list, i, &out) == true);
-        assert(out == total - i - 1);
+        assert(out == (int)(total - i - 1));
     }
 
     clock_t sort_start = clock();
@@ -292,11 +292,11 @@ void test_arraylist_performance_and_stress(void) {
     assert(arraylist_get(&list, 0, &first));
     assert(arraylist_get(&list, total - 1, &last));
     assert(first == 0);
-    assert(last == total - 1);
-    for (int i = 0; i < total; i++) {
+    assert(last == (int)(total - 1));
+    for (size_t i = 0; i < total; i++) {
         int out = -1;
         assert(arraylist_get(&list, i, &out));
-        assert(out == i);
+        assert(out == (int)i);
     }
 
     arraylist_free(&list);
@@ -304,7 +304,7 @@ void test_arraylist_performance_and_stress(void) {
     clock_t end = clock();
     double total_time = (double)(end - start) / CLOCKS_PER_SEC;
     double sort_time = (double)(sort_end - sort_start) / CLOCKS_PER_SEC;
-    printf("ArrayList benchmark: %d elements in %.6f seconds (sort: %.6f seconds).\n",
+    printf("ArrayList benchmark: %zu elements in %.6f seconds (sort: %.6f seconds).\n",
            total, total_time, sort_time);
 
 }
