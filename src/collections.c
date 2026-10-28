@@ -257,7 +257,7 @@ char char_max(char a, char b) {
 // STRING
 // ==========================================================
 
-static void string_reserve(String* string, size_t required_capacity) {
+void string_reserve(String* string, size_t required_capacity) {
     if (required_capacity <= string->_capacity)
         return;
 
@@ -282,7 +282,9 @@ static void string_reserve(String* string, size_t required_capacity) {
     string->_capacity = capacity;
 }
 
-static inline char* string_get_str_modify(String* string);
+static inline char* string_get_str_modify(String* string) {
+    return string->_is_local ? string->_data._local : string->_data._memory;
+}
 
 String string_create(const char* str) {
     String string = string_empty();
@@ -313,7 +315,7 @@ String string_empty(void) {
     String string = {
         ._capacity = STRING_LOCAL_CAPACITY,
         ._hash = 0,
-        ._hash_computed = false,
+        ._hash_computed = true,
         ._size = 1,
         ._is_local = true
     };
@@ -322,10 +324,6 @@ String string_empty(void) {
 }
 
 const char* string_get_str(const String* string) {
-    return string->_is_local ? string->_data._local : string->_data._memory;
-}
-
-static inline char* string_get_str_modify(String* string) {
     return string->_is_local ? string->_data._local : string->_data._memory;
 }
 
@@ -439,7 +437,7 @@ void string_clear(String* string) {
     string->_capacity = STRING_LOCAL_CAPACITY;
     string->_size = 1;
     string->_hash = 0;
-    string->_hash_computed = false;
+    string->_hash_computed = true;
     string->_is_local = true;
     string->_data._local[0] = '\0';
 }
@@ -543,8 +541,10 @@ void string_foreach(String* string, void (*function)(size_t, char*)) {
 // ARRAY LIST
 // ==========================================================
 
-static inline void arraylist_resize(ArrayList* list){
-    list->_capacity <<= 1;
+void arraylist_reserve(ArrayList* list, size_t capacity){
+    if (capacity <= list->_capacity)
+        return;
+    while (list->_capacity < capacity) list->_capacity <<= 1;
     list->_memory = realloc(list->_memory, list->_capacity * list->_element_size);
 }
 
@@ -590,8 +590,7 @@ bool arraylist_insert_index(ArrayList* list, size_t idx, const void* element) {
     if (idx > list->_size)
         return 0;
 
-    if (list->_size == list->_capacity)
-        arraylist_resize(list);
+    arraylist_reserve(list, list->_size + 1);
 
     for (size_t i = list->_size; i > idx; i--){
         memcpy(list->_memory + i * list->_element_size, list->_memory + (i - 1) * list->_element_size, list->_element_size);
@@ -622,8 +621,7 @@ void arraylist_clear(ArrayList* list) {
 }
 
 void arraylist_append(ArrayList* list, const void* element) {
-    if (list->_size == list->_capacity)
-        arraylist_resize(list);
+    arraylist_reserve(list, list->_size + 1);
 
     memcpy(list->_memory + list->_size * list->_element_size, element, list->_element_size);
     list->_size++;
@@ -776,8 +774,10 @@ void arraylist_foreach(ArrayList* list, void(*function)(size_t, void*)) {
 // ARRAY DEQUE
 // ==========================================================
 
-static inline void arraydeque_resize(ArrayDeque* deque) {
-    deque->_capacity <<= 1;
+void arraydeque_reserve(ArrayDeque* deque, size_t capacity) {
+    if (capacity <= deque->_capacity)
+        return;
+    while (deque->_capacity < capacity) deque->_capacity <<= 1;
     deque->_mask = deque->_capacity - 1;
 
     uint8_t* old_memory = deque->_memory;
@@ -849,8 +849,7 @@ bool arraydeque_peekleft(const ArrayDeque* deque, void* out) {
 }
 
 void arraydeque_append(ArrayDeque* deque, const void* element) {
-    if (deque->_size == deque->_capacity)
-        arraydeque_resize(deque);
+    arraydeque_reserve(deque, deque->_size + 1);
 
     memcpy(
         deque->_memory + deque->_tail * deque->_element_size,
@@ -863,8 +862,7 @@ void arraydeque_append(ArrayDeque* deque, const void* element) {
 }
 
 void arraydeque_appendleft(ArrayDeque* deque, const void* element) {
-    if (deque->_size == deque->_capacity)
-        arraydeque_resize(deque);
+    arraydeque_reserve(deque, deque->_size + 1);
 
     deque->_head = (deque->_head - 1 + deque->_capacity) & deque->_mask;
 
@@ -943,8 +941,10 @@ void arraydeque_foreach(ArrayDeque* deque, void(*function)(size_t, void*)) {
 // HEAP
 // ==========================================================
 
-static inline void heap_resize(Heap* heap) {
-    heap->_capacity <<= 1;
+void heap_reserve(Heap* heap, size_t capacity) {
+    if (capacity <= heap->_capacity)
+        return;
+    while (heap->_capacity < capacity) heap->_capacity <<= 1;
     heap->_memory = realloc(heap->_memory, heap->_capacity * heap->_element_size);
 }
 
@@ -970,8 +970,7 @@ size_t heap_length(const Heap* heap) {
 }
 
 void heap_push(Heap* heap, const void* element) {
-    if (heap->_size == heap->_capacity)
-        heap_resize(heap);
+    heap_reserve(heap, heap->_size + 1);
 
     size_t i = heap->_size;
     while (i > 0) {
@@ -1095,8 +1094,11 @@ static inline uint64_t double_hash_step(uint64_t hash) {
     return (hash * 0x9e3779b97f4a7c15ULL) | 1;
 }
 
-static inline void hashmap_resize(HashMap* map) {
+void hashmap_reserve(HashMap* map, size_t capacity) {
+    if (capacity <= map->_capacity)
+        return;
     size_t new_capacity = map->_capacity << 1;
+    while (new_capacity < capacity) new_capacity <<= 1;
     size_t new_mask = new_capacity - 1;
 
     uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
@@ -1186,8 +1188,8 @@ size_t hashmap_length(const HashMap* map) {
 }
 
 void hashmap_set(HashMap* map, const void* key, const void* value, void* old_value) {
-    if (map->_size == map->_max_elements)
-        hashmap_resize(map);
+    if (map->_size >= map->_max_elements)
+        hashmap_reserve(map, map->_capacity << 1);
 
     uint64_t hash = map->_hash(key);
     uint64_t step = double_hash_step(hash);
@@ -1267,6 +1269,7 @@ bool hashmap_remove(HashMap* map, const void* key, void* out) {
 
 HashMap hashmap_copy(const HashMap* map) {
     HashMap copy = hashmap_create(map->_key_size, map->_value_size, map->_equals, map->_hash);
+    hashmap_reserve(&copy, map->_capacity);
 
     for (size_t i = 0; i < map->_capacity; i++){
         if (map->_states[i] != HASHTABLE_USED) 
@@ -1313,8 +1316,11 @@ void hashmap_items(HashMap* map, void (*function)(const void*, void*)) {
 // HASH SET
 // ==========================================================
 
-static inline void hashset_resize(HashSet* set) {
+void hashset_reserve(HashSet* set, size_t capacity) {
+    if (capacity <= set->_capacity) 
+        return;
     size_t new_capacity = set->_capacity << 1;
+    while (new_capacity < capacity) new_capacity <<= 1;
     size_t new_mask = new_capacity - 1;
 
     uint64_t* new_hash_cache = malloc(sizeof(uint64_t) * new_capacity);
@@ -1391,8 +1397,8 @@ size_t hashset_length(const HashSet* set) {
 }
 
 bool hashset_add(HashSet* set, const void* element) {
-    if (set->_size == set->_max_elements)
-        hashset_resize(set);
+    if (set->_size >= set->_max_elements)
+        hashset_reserve(set, set->_capacity << 1);
 
     uint64_t hash = set->_hash(element);
     uint64_t step = double_hash_step(hash);
@@ -1456,6 +1462,7 @@ bool hashset_remove(HashSet* set, const void* element) {
 
 HashSet hashset_copy(const HashSet* set) {
     HashSet copy = hashset_create(set->_element_size, set->_equals, set->_hash);
+    hashset_reserve(&copy, set->_capacity);
 
     for (size_t i = 0; i < set->_capacity; i++){
         if (set->_states[i] != HASHTABLE_USED)
@@ -1476,6 +1483,7 @@ void hashset_clear(HashSet* set) {
 
 HashSet hashset_union(const HashSet* a, const HashSet* b) {
     HashSet result = hashset_copy(a);
+    hashset_reserve(&result, a->_capacity + b->_capacity);
     
     for (size_t i = 0; i < b->_capacity; i++){
         if (b->_states[i] != HASHTABLE_USED)
@@ -1500,6 +1508,7 @@ HashSet hashset_intersection(const HashSet* a, const HashSet* b) {
     }
 
     HashSet result = hashset_create(a->_element_size, a->_equals, a->_hash);
+    hashset_reserve(&result, smaller->_capacity);
 
     for (size_t i = 0; i < smaller->_capacity; i++){
         if (smaller->_states[i] != HASHTABLE_USED)

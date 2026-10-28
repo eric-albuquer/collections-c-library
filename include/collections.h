@@ -80,6 +80,8 @@ typedef struct String {
     } _data;
 } String;
 
+void string_reserve(String* string, size_t required_capacity);
+
 String string_create(const char* str);
 void string_free(String* string);
 String string_copy(const String* string);
@@ -126,6 +128,8 @@ typedef struct ArrayList {
     uint8_t* _memory;
 } ArrayList;
 
+void arraylist_reserve(ArrayList* list, size_t capacity);
+
 ArrayList arraylist_create(size_t element_size, size_t initial_size);
 void arraylist_free(ArrayList* list);
 ArrayList arraylist_copy(const ArrayList* list);
@@ -168,6 +172,8 @@ typedef struct ArrayDeque {
     uint8_t* _memory;
 } ArrayDeque;
 
+void arraydeque_reserve(ArrayDeque* deque, size_t capacity);
+
 ArrayDeque arraydeque_create(size_t element_size);
 void arraydeque_free(ArrayDeque* deque);
 
@@ -201,6 +207,8 @@ typedef struct Heap {
     size_t _size;
     uint8_t* _memory;
 } Heap;
+
+void heap_reserve(Heap* heap, size_t capacity);
 
 Heap heap_create(size_t element_size, cmp_fn cmp);
 void heap_free(Heap* heap);
@@ -239,6 +247,8 @@ typedef struct HashMap {
     uint8_t* _values;
 } HashMap;
 
+void hashmap_reserve(HashMap* map, size_t capacity);
+
 HashMap hashmap_create(size_t key_size, size_t value_size, equals_fn equals, hash_fn hash);
 void hashmap_free(HashMap* map);
 
@@ -274,6 +284,8 @@ typedef struct HashSet {
     uint64_t* _hash_cache;
     uint8_t* _elements;
 } HashSet;
+
+void hashset_reserve(HashSet* set, size_t capacity);
 
 HashSet hashset_create(size_t element_size, equals_fn equals, hash_fn hash);
 void hashset_free(HashSet* set);
